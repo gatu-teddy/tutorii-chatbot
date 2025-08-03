@@ -29,7 +29,7 @@ app.post('/webhook', async (req, res) => {
 
   // Call GPT
   const reply = await axios.post('https://openrouter.ai/api/v1/chat/completions', {
-    model: 'openai/gpt-3.5-turbo',
+    model: 'mistralai/mistral-small-3.2-24b-instruct',
     messages
   }, {
     headers: {
