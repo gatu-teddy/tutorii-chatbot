@@ -27,20 +27,40 @@ app.post('/webhook', async (req, res) => {
   res.sendStatus(200); // Fast response to Twilio
 
   // Check admin trigger first
-  if (from === process.env.ADMIN_NUMBER && body.toLowerCase() === 'trigger max') {
+ app.post('/webhook', async (req, res) => {
+  const from = req.body.From?.trim();
+  const body = (req.body.Body || '').trim().toLowerCase();
+
+  // 1. ADMIN TRIGGER PATH
+  if (from === process.env.ADMIN_NUMBER && body === 'trigger max') {
+    console.log('✅ Admin trigger received');
+
+    // Respond to admin
+    try {
+      await client.messages.create({
+        from: process.env.TWILIO_FROM,
+        to: from,
+        body: 'Template sent to max ✅'
+      });
+    } catch (err) {
+      console.error('❌ Failed to respond to admin:', err.message);
+    }
+
+    // Send template to each target (no placeholders)
     for (const number of targets) {
       try {
         await client.messages.create({
           from: process.env.TWILIO_FROM,
           to: number,
-          body: "Hello! This is Tutorii.com checking in with a special offer. Are you ready to start earning by helping others learn?"
+          contentSid: process.env.TEMPLATE_SID
         });
-        console.log(`Triggered message sent to ${number}`);
+        console.log(`📤 Template sent to ${number}`);
       } catch (err) {
-        console.error(`Failed to send to ${number}:`, err.message);
+        console.error(`❌ Failed to send to ${number}:`, err.message);
       }
     }
-    return; // Done with admin trigger message
+
+    return res.sendStatus(200);
   }
 
   // Normal user message — prepare GPT messages
