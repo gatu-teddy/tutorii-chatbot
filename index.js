@@ -12,24 +12,20 @@ app.use(express.json());
 
 const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 
-// Load target numbers once at startup
+// Load target numbers from JSON file
 let targets = [];
 try {
   targets = JSON.parse(fs.readFileSync('./targets.json', 'utf-8'));
+  console.log(`✅ Loaded ${targets.length} target numbers`);
 } catch (err) {
   console.error('❌ Failed to load targets.json:', err.message);
 }
 
 app.post('/webhook', async (req, res) => {
-  const from = req.body.From;
-  const body = (req.body.Body || '').trim();
-
-  res.sendStatus(200); // Fast response to Twilio
-
-  // Check admin trigger first
- app.post('/webhook', async (req, res) => {
   const from = req.body.From?.trim();
   const body = (req.body.Body || '').trim().toLowerCase();
+
+  res.sendStatus(200); // Respond immediately to Twilio
 
   // 1. ADMIN TRIGGER PATH
   if (from === process.env.ADMIN_NUMBER && body === 'trigger max') {
@@ -46,7 +42,7 @@ app.post('/webhook', async (req, res) => {
       console.error('❌ Failed to respond to admin:', err.message);
     }
 
-    // Send template to each target (no placeholders)
+    // Send template to each target
     for (const number of targets) {
       try {
         await client.messages.create({
@@ -60,17 +56,17 @@ app.post('/webhook', async (req, res) => {
       }
     }
 
-    return res.sendStatus(200);
+    return;
   }
 
-  // Normal user message — prepare GPT messages
+  // 2. NORMAL USER MESSAGE — GPT path
   const systemMessage = "You are a friendly recruitment bot from Tutorii.com.";
   const messages = [
     { role: "system", content: systemMessage },
     { role: "user", content: body }
   ];
 
-  // Wait 60 seconds to simulate delay before replying
+  // Wait 60 seconds before replying
   await new Promise(resolve => setTimeout(resolve, 60000));
 
   try {
@@ -104,4 +100,4 @@ app.post('/webhook', async (req, res) => {
 app.get('/', (req, res) => res.send('Tutorii bot running'));
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
