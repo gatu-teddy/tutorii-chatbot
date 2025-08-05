@@ -42,21 +42,21 @@ app.post('/webhook', async (req, res) => {
       console.error('❌ Failed to respond to admin:', err.message);
     }
 
-    // Send template to each target
+    // Send "Hey" to each target
     for (const number of targets) {
       try {
         await client.messages.create({
           from: process.env.TWILIO_FROM,
           to: number,
-          contentSid: process.env.TEMPLATE_SID
+          body: "Hey"
         });
-        console.log(`📤 Template sent to ${number}`);
+        console.log(`📤 "Hey" sent to ${number}`);
       } catch (err) {
         console.error(`❌ Failed to send to ${number}:`, err.message);
       }
     }
 
-    return;
+    return; // Stop here, don’t process GPT for admin
   }
 
   // 2. NORMAL USER MESSAGE — GPT path
