@@ -1,4 +1,7 @@
-exports.handler = async function (context, event, callback) {
+import axios from "axios";
+import Twilio from "twilio";
+
+export const handler = async function (context, event, callback) {
   const axios = require("axios");
   const twiml = new Twilio.twiml.MessagingResponse();
   const client = context.getTwilioClient();
