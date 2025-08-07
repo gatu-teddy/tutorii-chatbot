@@ -4,7 +4,7 @@ exports.handler = async function (context, event, callback) {
   const client = context.getTwilioClient();
 
   const ADMIN_NUMBER = "whatsapp:+971567728465";
-  const TARGET_NUMBER = "whatsapp:+447826939737";
+  const TARGET_NUMBER = "whatsapp:+254796143065";
   const TRIGGER_KEYWORD = "trigger max";
   const CONTENT_SID = "HX9eff360b577f37795e5b78e3b9736375";
   const FROM_NUMBER = "whatsapp:+971504095079";
