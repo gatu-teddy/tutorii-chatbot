@@ -16,8 +16,8 @@ const FROM_NUMBER = "whatsapp:+971504095079";
 
 const scriptSteps = [
   "Hi there, how are you? I recently came across your CV online. My name is David and I’m contacting you on behalf of tutorii.com...",
-  "So, Tutorii.com is a subscription-based educational platform...",
-  "Right now, we’re looking to bring on new Sales Managers..."
+  "So, Tutorii.com is a subscription-based educational platform designed to empower individuals with practical knowledge about life in the UAE and the wider GCC region — from protecting yourself and understanding local systems, to finding jobs and building your career. But that’s not all — as a subscriber, you also unlock the chance to earn a strong, recurring income by simply referring others. It’s a great opportunity to start your own business, take control of your future, and grow financially — all while learning skills that genuinely improve your life.",
+  "Right now, we’re looking to bring on new Sales Managers who want to grow with the platform, invite others to join, and build a solid foundation in business, leadership, and online income. To give you a better idea, I’d love to share a short introductory video that breaks everything down — how Tutorii works, how you learn, and how you earn. How does that sound?"
 ];
 
 const videoLinks = {
@@ -27,8 +27,35 @@ const videoLinks = {
   tl: "https://mytutoriitestbucket.s3.eu-north-1.amazonaws.com/Tutorii+Tagalog-1080P-250621.mp4"
 };
 
-// In-memory session store (replace with DB or Twilio Sync if needed)
-const sessions = {};
+// --- Twilio Sync helper functions ---
+async function getSession(id) {
+  try {
+    const doc = await client.sync.v1.services(process.env.SYNC_SERVICE_SID)
+      .documents(id)
+      .fetch();
+    return doc.data;
+  } catch (e) {
+    if (e.status === 404) {
+      return { step: 0, lang: "", messages: [] }; // new session
+    }
+    throw e;
+  }
+}
+
+async function saveSession(id, data) {
+  try {
+    await client.sync.v1.services(process.env.SYNC_SERVICE_SID)
+      .documents(id)
+      .update({ data });
+  } catch (e) {
+    if (e.status === 404) {
+      await client.sync.v1.services(process.env.SYNC_SERVICE_SID)
+        .documents.create({ uniqueName: id, data });
+    } else {
+      throw e;
+    }
+  }
+}
 
 app.post("/webhook", async (req, res) => {
   console.log("📩 Incoming webhook from Twilio");
@@ -40,27 +67,37 @@ app.post("/webhook", async (req, res) => {
   console.log(`📨 From: ${from}`);
   console.log(`💬 Body: ${body}`);
 
-  // Initialize session if not exists
-  if (!sessions[from]) {
-    sessions[from] = { step: 0, lang: "", messages: [] };
-  }
-  let { step, lang, messages } = sessions[from];
+  let { step, lang, messages } = await getSession(from);
 
   // ✅ Admin trigger
   if (from === ADMIN_NUMBER && body.toLowerCase().includes(TRIGGER_KEYWORD)) {
+    console.log("🚀 Admin trigger detected — sending template + first script");
     await client.messages.create({
       from: FROM_NUMBER,
       to: TARGET_NUMBER,
       contentSid: CONTENT_SID,
       contentVariables: JSON.stringify({ name: "David" })
     });
-    twiml.message("✅ Template sent to Max.");
+
+    await saveSession(TARGET_NUMBER, {
+      step: 0,
+      lang: "",
+      messages: [{ role: "assistant", content: scriptSteps[0] }]
+    });
+
+    await client.messages.create({
+      from: FROM_NUMBER,
+      to: TARGET_NUMBER,
+      body: scriptSteps[0]
+    });
+
+    twiml.message("✅ Template + script started for target.");
     return res.type("text/xml").send(twiml.toString());
   }
 
   // ✅ Reset session
   if (body.toLowerCase() === "reset") {
-    sessions[from] = { step: 0, lang: "", messages: [] };
+    await saveSession(from, { step: 0, lang: "", messages: [] });
     twiml.message("✅ Session reset. Say something to start again.");
     return res.type("text/xml").send(twiml.toString());
   }
@@ -82,7 +119,7 @@ app.post("/webhook", async (req, res) => {
     step++;
     const next = scriptSteps[step];
     messages.push({ role: "assistant", content: next });
-    sessions[from] = { step, lang, messages };
+    await saveSession(from, { step, lang, messages });
     twiml.message(next);
     return res.type("text/xml").send(twiml.toString());
   }
@@ -101,7 +138,7 @@ app.post("/webhook", async (req, res) => {
       twiml.message(reply);
     }
 
-    sessions[from] = { step, lang, messages };
+    await saveSession(from, { step, lang, messages });
     return res.type("text/xml").send(twiml.toString());
   }
 
@@ -121,15 +158,15 @@ app.post("/webhook", async (req, res) => {
       },
       {
         headers: {
-          Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+          Authorization: `Bearer ${process.env.GPT_API_KEY}`,
           "Content-Type": "application/json"
         }
       }
     );
 
-    const gptReply = gptRes.data.choices[0].message.content;
+    const gptReply = gptRes.data.choices?.[0]?.message?.content || "⚠️ No response from AI.";
     messages.push({ role: "assistant", content: gptReply });
-    sessions[from] = { step, lang, messages };
+    await saveSession(from, { step, lang, messages });
 
     twiml.message(gptReply);
     return res.type("text/xml").send(twiml.toString());
