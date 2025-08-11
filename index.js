@@ -77,22 +77,11 @@ app.post("/webhook", async (req, res) => {
         from: FROM_NUMBER,
         to: TARGET_NUMBER,
         contentSid: CONTENT_SID,
-        contentVariables: JSON.stringify({ name: "David" })
+        //contentVariables: JSON.stringify({ name: "David" })
       });
       console.log("✅ Template message sent:", templateMsg.sid);
     } catch (error) {
       console.error("❌ Error sending template message:", error);
-    }
-
-    try {
-      const scriptMsg = await client.messages.create({
-        from: FROM_NUMBER,
-        to: TARGET_NUMBER,
-        body: scriptSteps[0]
-      });
-      console.log("✅ Script message sent:", scriptMsg.sid);
-    } catch (error) {
-      console.error("❌ Error sending script message:", error);
     }
 
     twiml.message("✅ Template + script started for target.");
