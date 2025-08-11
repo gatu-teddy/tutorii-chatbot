@@ -27,10 +27,8 @@ const videoLinks = {
   tl: "https://mytutoriitestbucket.s3.eu-north-1.amazonaws.com/Tutorii+Tagalog-1080P-250621.mp4"
 };
 
-// Delay helper
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-// Twilio Sync helpers
 async function getSession(id) {
   try {
     const doc = await client.sync.v1.services(process.env.SYNC_SERVICE_SID)
@@ -70,34 +68,38 @@ app.post("/webhook", async (req, res) => {
 
   let { step, lang, messages } = await getSession(from);
 
-  // Admin trigger - send immediately, no delay
+  // Admin trigger - send immediately with error logging
   if (from === ADMIN_NUMBER && body.toLowerCase().includes(TRIGGER_KEYWORD)) {
     console.log("🚀 Admin trigger detected — sending template + first script");
 
-    await client.messages.create({
-      from: FROM_NUMBER,
-      to: TARGET_NUMBER,
-      contentSid: CONTENT_SID,
-      contentVariables: JSON.stringify({ name: "David" })
-    });
+    try {
+      const templateMsg = await client.messages.create({
+        from: FROM_NUMBER,
+        to: TARGET_NUMBER,
+        contentSid: CONTENT_SID,
+        contentVariables: JSON.stringify({ name: "David" })
+      });
+      console.log("✅ Template message sent:", templateMsg.sid);
+    } catch (error) {
+      console.error("❌ Error sending template message:", error);
+    }
 
-    await saveSession(TARGET_NUMBER, {
-      step: 0,
-      lang: "",
-      messages: [{ role: "assistant", content: scriptSteps[0] }]
-    });
-
-    await client.messages.create({
-      from: FROM_NUMBER,
-      to: TARGET_NUMBER,
-      body: scriptSteps[0]
-    });
+    try {
+      const scriptMsg = await client.messages.create({
+        from: FROM_NUMBER,
+        to: TARGET_NUMBER,
+        body: scriptSteps[0]
+      });
+      console.log("✅ Script message sent:", scriptMsg.sid);
+    } catch (error) {
+      console.error("❌ Error sending script message:", error);
+    }
 
     twiml.message("✅ Template + script started for target.");
     return res.type("text/xml").send(twiml.toString());
   }
 
-  // For all other users, delay response by 1 minute before replying
+  // Delay all other bot replies by 1 minute
   await delay(60000);
 
   // Reset session
