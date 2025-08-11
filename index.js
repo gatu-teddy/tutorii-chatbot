@@ -27,7 +27,10 @@ const videoLinks = {
   tl: "https://mytutoriitestbucket.s3.eu-north-1.amazonaws.com/Tutorii+Tagalog-1080P-250621.mp4"
 };
 
-// --- Twilio Sync helper functions ---
+// Delay helper
+const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+// Twilio Sync helpers
 async function getSession(id) {
   try {
     const doc = await client.sync.v1.services(process.env.SYNC_SERVICE_SID)
@@ -35,9 +38,7 @@ async function getSession(id) {
       .fetch();
     return doc.data;
   } catch (e) {
-    if (e.status === 404) {
-      return { step: 0, lang: "", messages: [] }; // new session
-    }
+    if (e.status === 404) return { step: 0, lang: "", messages: [] };
     throw e;
   }
 }
@@ -69,9 +70,10 @@ app.post("/webhook", async (req, res) => {
 
   let { step, lang, messages } = await getSession(from);
 
-  // ✅ Admin trigger
+  // Admin trigger - send immediately, no delay
   if (from === ADMIN_NUMBER && body.toLowerCase().includes(TRIGGER_KEYWORD)) {
     console.log("🚀 Admin trigger detected — sending template + first script");
+
     await client.messages.create({
       from: FROM_NUMBER,
       to: TARGET_NUMBER,
@@ -95,7 +97,10 @@ app.post("/webhook", async (req, res) => {
     return res.type("text/xml").send(twiml.toString());
   }
 
-  // ✅ Reset session
+  // For all other users, delay response by 1 minute before replying
+  await delay(60000);
+
+  // Reset session
   if (body.toLowerCase() === "reset") {
     await saveSession(from, { step: 0, lang: "", messages: [] });
     twiml.message("✅ Session reset. Say something to start again.");
@@ -104,7 +109,7 @@ app.post("/webhook", async (req, res) => {
 
   messages.push({ role: "user", content: body });
 
-  // ✅ Language selection step
+  // Language selection step
   if (step === 0) {
     const lower = body.toLowerCase();
     if (lower.includes("english") || lower.includes("eng")) lang = "en";
@@ -124,7 +129,7 @@ app.post("/webhook", async (req, res) => {
     return res.type("text/xml").send(twiml.toString());
   }
 
-  // ✅ Sequential script steps
+  // Sequential script steps
   if (step < scriptSteps.length) {
     step++;
     const reply = scriptSteps[step];
@@ -142,7 +147,7 @@ app.post("/webhook", async (req, res) => {
     return res.type("text/xml").send(twiml.toString());
   }
 
-  // ✅ GPT fallback
+  // GPT fallback
   try {
     const gptRes = await axios.post(
       "https://openrouter.ai/api/v1/chat/completions",
