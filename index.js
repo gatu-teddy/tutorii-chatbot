@@ -198,9 +198,8 @@ await sendDelayedMessage({ from: FROM_NUMBER, to: from, body: aiReply });
         headers: {
           Authorization: `Bearer ${process.env.GPT_API_KEY}`,
           "Content-Type": "application/json"
-        }
-      }
-    );
+        });
+}
 
     const gptReply = gptRes.data.choices?.[0]?.message?.content || "⚠️ No response from AI.";
     messages.push({ role: "assistant", content: gptReply });
