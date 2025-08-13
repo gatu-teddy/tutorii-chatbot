@@ -143,24 +143,18 @@ app.post("/webhook", async (req, res) => {
     const reply = scriptSteps[step];
     messages.push({ role: "assistant", content: reply });
 
-  if (step === scriptSteps.length - 2) {
-    // Second last step — send video + text
+  if (step === scriptSteps.length -1) {
+    const videoUrl = videoLinks[lang] || videoLinks.en;
     await sendDelayedMessage({
       from: FROM_NUMBER,
       to: from,
-      body: `${reply}\n\nHere’s a quick intro video:`,
+      body: reply + videoUrl,
       mediaUrl: [videoUrl]
     });
   } else {
-    // Other steps — just send text
-    await sendDelayedMessage({
-      from: FROM_NUMBER,
-      to: from,
-      body: reply
-    });
+    await sendDelayedMessage({ from: FROM_NUMBER, to: from, body: reply });
   }
 
-  step++;
   await saveSession(from, { step, lang, messages });
     return;
   }
