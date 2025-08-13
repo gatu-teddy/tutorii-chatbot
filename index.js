@@ -150,22 +150,31 @@ app.post("/webhook", async (req, res) => {
   }
 
   // Sequential script steps
-  const steps = scriptSteps(lang);
-  if (step < steps.length - 1) {
-    step++;
-    const replyStep = steps[step];
-    messages.push({ role: "assistant", content: replyStep.body });
+const steps = scriptSteps(lang);
+if (step < steps.length - 1) {
+  step++;
+  const replyStep = steps[step];
+  messages.push({ role: "assistant", content: replyStep.body });
 
+  // Send text first
+  await sendDelayedMessage({
+    from: FROM_NUMBER,
+    to: from,
+    body: replyStep.body
+  });
+
+  // Send media if it exists
+  if (replyStep.mediaUrl) {
     await sendDelayedMessage({
       from: FROM_NUMBER,
       to: from,
-      body: replyStep.body,
       mediaUrl: replyStep.mediaUrl
     });
-
-    await saveSession(from, { step, lang, messages });
-    return;
   }
+
+  await saveSession(from, { step, lang, messages });
+  return;
+}
 
   // After script → GPT fallback
   try {
