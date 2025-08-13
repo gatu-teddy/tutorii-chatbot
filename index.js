@@ -143,7 +143,7 @@ app.post("/webhook", async (req, res) => {
     const reply = scriptSteps[step];
     messages.push({ role: "assistant", content: reply });
 
-  if (step === scriptSteps.length -1) {
+  if (step === scriptSteps.length - 2) {
     const videoUrl = videoLinks[lang] || videoLinks.en;
     await sendDelayedMessage({
       from: FROM_NUMBER,
