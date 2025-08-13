@@ -14,18 +14,27 @@ const TRIGGER_KEYWORD = "trigger max";
 const CONTENT_SID = "HX9eff360b577f37795e5b78e3b9736375";
 const FROM_NUMBER = "whatsapp:+971504095079";
 
-const scriptSteps = [
-  "Hi there, how are you? I recently came across your CV online. My name is David and I’m contacting you on behalf of tutorii.com. We think you might be a great fit for an opportunity we’re currently offering. We are currently looking for salespeople to help the growth of our platform. Might this be something of interest to you?",
-  "So, Tutorii.com is a subscription-based educational platform designed to empower individuals with practical knowledge about life in the UAE and the wider GCC region — from protecting yourself and understanding local systems, to finding jobs and building your career. But that’s not all — as a subscriber, you also unlock the chance to earn a strong, recurring income by simply referring others. It’s a great opportunity to start your own business, take control of your future, and grow financially — all while learning skills that genuinely improve your life. Here's a short video to help you understand.",
-  "Right now, we’re looking to bring on new Sales Managers who want to grow with the platform, invite others to join, and build a solid foundation in business, leadership, and online income. Feel free to ask any question about the platform. Click on Tutorii.com to join the team."
-];
-
 const videoLinks = {
   en: "https://mytutoriitestbucket.s3.eu-north-1.amazonaws.com/Tutorii+English-1080p-250621.mp4",
   ur: "https://mytutoriitestbucket.s3.eu-north-1.amazonaws.com/Tutorii+Urdu-1080P-250621(1).mp4",
   hi: "https://mytutoriitestbucket.s3.eu-north-1.amazonaws.com/Tutorii+Hindi-1080P-250621.mp4",
   tl: "https://mytutoriitestbucket.s3.eu-north-1.amazonaws.com/Tutorii+Tagalog-1080P-250621.mp4"
 };
+
+const scriptSteps = (lang) => [
+  {
+    body: "Hi there, how are you? I recently came across your CV online. My name is David and I’m contacting you on behalf of tutorii.com. We think you might be a great fit for an opportunity we’re currently offering. We are currently looking for salespeople to help the growth of our platform. Might this be something of interest to you?"
+  },
+  {
+    body: "So, Tutorii.com is a subscription-based educational platform designed to empower individuals with practical knowledge about life in the UAE and the wider GCC region — from protecting yourself and understanding local systems, to finding jobs and building your career.. Here's a short video to help you understand.",
+    mediaUrl: [videoLinks[lang] || videoLinks.en]
+  },
+  {
+    body: "Right now, we’re looking to bring on new Sales Managers who want to grow with the platform, invite others to join, and build a solid foundation in business, leadership, and online income. Feel free to ask any question about the platform. Click on Tutorii.com to join the team."
+  }
+];
+
+
 
 // Helper delay function
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -113,48 +122,60 @@ app.post("/webhook", async (req, res) => {
   messages.push({ role: "user", content: body });
 
   // Language selection step
-  if (step === 0) {
-    const lower = body.toLowerCase();
-    if (lower.includes("english") || lower.includes("eng")) lang = "en";
-    else if (lower.includes("urdu") || lower.includes("اردو")) lang = "ur";
-    else if (lower.includes("hindi") || lower.includes("हिन्दी")) lang = "hi";
-    else if (lower.includes("filipino") || lower.includes("pilipino") || lower.includes("tagalog")) lang = "tl";
-    else {
-      await sendDelayedMessage({
-        from: FROM_NUMBER,
-        to: from,
-        body: "❌ Sorry, that's not a supported language. Please reply with English, Pilipino, اردو, or हिन्दी."
-      });
-      return;
-    }
-
-    step++;
-    const next = scriptSteps[step];
-    messages.push({ role: "assistant", content: next });
-    await saveSession(from, { step, lang, messages });
-
-    await sendDelayedMessage({ from: FROM_NUMBER, to: from, body: next });
-    return;
-  }
-
-  // Sequential script steps
-  if (step < scriptSteps.length) {
-    step++;
-    const reply = scriptSteps[step];
-    messages.push({ role: "assistant", content: reply });
-
-  if (step === scriptSteps.length - 2) {
-    const videoUrl = videoLinks[lang] || videoLinks.en;
+if (step === 0) {
+  const lower = body.toLowerCase();
+  if (lower.includes("english") || lower.includes("eng")) lang = "en";
+  else if (lower.includes("urdu") || lower.includes("اردو")) lang = "ur";
+  else if (lower.includes("hindi") || lower.includes("हिन्दी")) lang = "hi";
+  else if (lower.includes("filipino") || lower.includes("pilipino") || lower.includes("tagalog")) lang = "tl";
+  else {
     await sendDelayedMessage({
       from: FROM_NUMBER,
       to: from,
-      body: reply + videoUrl,
-      mediaUrl: [videoUrl]
+      body: "❌ Sorry, that's not a supported language. Please reply with English, Pilipino, اردو, or हिन्दी."
     });
-  } else {
-    await sendDelayedMessage({ from: FROM_NUMBER, to: from, body: reply });
+    return;
   }
 
+  // Get full steps for chosen language
+  const steps = scriptSteps(lang);
+
+  step++;
+  const replyStep = steps[step];
+  messages.push({ role: "assistant", content: replyStep.body });
+
+  await sendDelayedMessage({
+    from: FROM_NUMBER,
+    to: from,
+    body: replyStep.body,
+    mediaUrl: replyStep.mediaUrl
+  });
+
+  await saveSession(from, { step, lang, messages });
+  return;
+}
+
+// Sequential script steps
+const steps = scriptSteps(lang);
+if (step < steps.length) {
+  step++;
+  const replyStep = steps[step];
+  messages.push({ role: "assistant", content: replyStep.body });
+
+  await sendDelayedMessage({
+    from: FROM_NUMBER,
+    to: from,
+    body: replyStep.body,
+    mediaUrl: replyStep.mediaUrl // only exists for the video step
+  });
+
+  await saveSession(from, { step, lang, messages });
+  return;
+}
+
+  // After script is finished → GPT fallback
+const aiReply = await callGPT(userMessage);
+await sendDelayedMessage({ from: FROM_NUMBER, to: from, body: aiReply });
   await saveSession(from, { step, lang, messages });
     return;
   }
