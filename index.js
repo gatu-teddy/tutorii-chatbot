@@ -26,15 +26,13 @@ const scriptSteps = (lang) => [
     body: "Hi there, how are you? I recently came across your CV online. My name is David and I’m contacting you on behalf of tutorii.com. We think you might be a great fit for an opportunity we’re currently offering. We are currently looking for salespeople to help the growth of our platform. Might this be something of interest to you?"
   },
   {
-    body: "So, Tutorii.com is a subscription-based educational platform designed to empower individuals with practical knowledge about life in the UAE and the wider GCC region — from protecting yourself and understanding local systems, to finding jobs and building your career.. Here's a short video to help you understand.",
+    body: "So, Tutorii.com is a subscription-based educational platform designed to empower individuals with practical knowledge about life in the UAE and the wider GCC region — from protecting yourself and understanding local systems, to finding jobs and building your career. Here's a short video to help you understand.",
     mediaUrl: [videoLinks[lang] || videoLinks.en]
   },
   {
     body: "Right now, we’re looking to bring on new Sales Managers who want to grow with the platform, invite others to join, and build a solid foundation in business, leadership, and online income. Feel free to ask any question about the platform. Click on Tutorii.com to join the team."
   }
 ];
-
-
 
 // Helper delay function
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -91,7 +89,6 @@ app.post("/webhook", async (req, res) => {
   // Admin trigger → send template after 1 minute
   if (from === ADMIN_NUMBER && body.toLowerCase().includes(TRIGGER_KEYWORD)) {
     console.log("🚀 Admin trigger detected — sending template message with delay");
-
     try {
       const templateMsg = await sendDelayedMessage({
         from: FROM_NUMBER,
@@ -100,7 +97,6 @@ app.post("/webhook", async (req, res) => {
       });
       console.log("✅ Template message sent:", templateMsg.sid);
 
-      // Save step progression for target
       await saveSession(TARGET_NUMBER, { step: 0, lang: "", messages: [] });
     } catch (error) {
       console.error("❌ Error sending template message:", error);
@@ -122,65 +118,56 @@ app.post("/webhook", async (req, res) => {
   messages.push({ role: "user", content: body });
 
   // Language selection step
-if (step === 0) {
-  const lower = body.toLowerCase();
-  if (lower.includes("english") || lower.includes("eng")) lang = "en";
-  else if (lower.includes("urdu") || lower.includes("اردو")) lang = "ur";
-  else if (lower.includes("hindi") || lower.includes("हिन्दी")) lang = "hi";
-  else if (lower.includes("filipino") || lower.includes("pilipino") || lower.includes("tagalog")) lang = "tl";
-  else {
+  if (step === 0) {
+    const lower = body.toLowerCase();
+    if (lower.includes("english") || lower.includes("eng")) lang = "en";
+    else if (lower.includes("urdu") || lower.includes("اردو")) lang = "ur";
+    else if (lower.includes("hindi") || lower.includes("हिन्दी")) lang = "hi";
+    else if (lower.includes("filipino") || lower.includes("pilipino") || lower.includes("tagalog")) lang = "tl";
+    else {
+      await sendDelayedMessage({
+        from: FROM_NUMBER,
+        to: from,
+        body: "❌ Sorry, that's not a supported language. Please reply with English, Pilipino, اردو, or हिन्दी."
+      });
+      return;
+    }
+
+    const steps = scriptSteps(lang);
+    step++;
+    const replyStep = steps[step];
+    messages.push({ role: "assistant", content: replyStep.body });
+
     await sendDelayedMessage({
       from: FROM_NUMBER,
       to: from,
-      body: "❌ Sorry, that's not a supported language. Please reply with English, Pilipino, اردو, or हिन्दी."
+      body: replyStep.body,
+      mediaUrl: replyStep.mediaUrl
     });
+
+    await saveSession(from, { step, lang, messages });
     return;
   }
 
-  // Get full steps for chosen language
+  // Sequential script steps
   const steps = scriptSteps(lang);
+  if (step < steps.length - 1) {
+    step++;
+    const replyStep = steps[step];
+    messages.push({ role: "assistant", content: replyStep.body });
 
-  step++;
-  const replyStep = steps[step];
-  messages.push({ role: "assistant", content: replyStep.body });
+    await sendDelayedMessage({
+      from: FROM_NUMBER,
+      to: from,
+      body: replyStep.body,
+      mediaUrl: replyStep.mediaUrl
+    });
 
-  await sendDelayedMessage({
-    from: FROM_NUMBER,
-    to: from,
-    body: replyStep.body,
-    mediaUrl: replyStep.mediaUrl
-  });
-
-  await saveSession(from, { step, lang, messages });
-  return;
-}
-
-// Sequential script steps
-const steps = scriptSteps(lang);
-if (step < steps.length) {
-  step++;
-  const replyStep = steps[step];
-  messages.push({ role: "assistant", content: replyStep.body });
-
-  await sendDelayedMessage({
-    from: FROM_NUMBER,
-    to: from,
-    body: replyStep.body,
-    mediaUrl: replyStep.mediaUrl // only exists for the video step
-  });
-
-  await saveSession(from, { step, lang, messages });
-  return;
-}
-
-  // After script is finished → GPT fallback
-const aiReply = await callGPT(userMessage);
-await sendDelayedMessage({ from: FROM_NUMBER, to: from, body: aiReply });
-  await saveSession(from, { step, lang, messages });
+    await saveSession(from, { step, lang, messages });
     return;
   }
 
-  // GPT fallback
+  // After script → GPT fallback
   try {
     const gptRes = await axios.post(
       "https://openrouter.ai/api/v1/chat/completions",
@@ -189,7 +176,7 @@ await sendDelayedMessage({ from: FROM_NUMBER, to: from, body: aiReply });
         messages: [
           {
             role: "system",
-            content: "You are David, a friendly recruiter for Tutorii.com. Stay on topic about Tutorii’s educational and referral website platform. Do not answer questions unrelated to Tutorii. Only list benefits from this information. Once the user shows interest , diect them to Tutorii.com so they can register or subscribe. Keep responses short, helpful, and persuasive. Never answer unrelated questions. COST & VALUE: If someone says they can’t afford it, say it’s very affordable and most people earn back the fee by referring a few others. If they mention free content, explain Tutorii is structured, focused on UAE/GCC, and includes income potential. If they ask if it’s worth it, confirm it’s a small investment with big learning and earning value. No monthly commitment—you can cancel anytime. No free trial — value unlocks with subscription. TRUST & LEGITIMACY: Tutorii is UAE-registered and licensed. Not a pyramid scheme—simple direct commissions. Transparent, with real education and support. HOW IT WORKS: Subscribe, learn, and optionally earn by referrals. Topics include life in UAE, worker rights, job hunting, money tips and access to a team of professionals. Different from YouTube—structured, focused, plus income. No selling or teaching required. TIME & COMMITMENT: Flexible, even 15 minutes per day helps. The sooner you start, the sooner you earn. EARNING & REFERRALS: Earnings depend on effort; 5 referrals can bring $100/month. Only earn while referrals stay subscribed. Weekly payouts via PayPal ; we guide setup. Commissions are 40% direct plus 5% second-level. ACCESS & LANGUAGE: Works globally, not just UAE. Content in English, Urdu, Tagalog, Hindi. Mobile-friendly, no laptop needed. LEGAL & ETHICAL: Fully allowed, doesn’t affect visas or jobs. Halal and ethical—just knowledge sharing. SKEPTICAL REPLIES: If they say they’re thinking about it, say starting now means earning sooner. If they want details later, send the link and stay available. PRICING: $19.85 US dollars/month, cancel anytime. Includes full learning access and referral tools. Always stay polite, positive, and focused on Tutorii."
+            content: "You are David, a friendly recruiter for Tutorii.com. Stay on topic about Tutorii’s educational and referral website platform. Keep responses short, helpful, persuasive. Always direct the user to Tutorii.com when interested."
           },
           ...messages
         ]
@@ -198,8 +185,9 @@ await sendDelayedMessage({ from: FROM_NUMBER, to: from, body: aiReply });
         headers: {
           Authorization: `Bearer ${process.env.GPT_API_KEY}`,
           "Content-Type": "application/json"
-        });
-}
+        }
+      }
+    );
 
     const gptReply = gptRes.data.choices?.[0]?.message?.content || "⚠️ No response from AI.";
     messages.push({ role: "assistant", content: gptReply });
