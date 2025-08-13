@@ -15,9 +15,9 @@ const CONTENT_SID = "HX9eff360b577f37795e5b78e3b9736375";
 const FROM_NUMBER = "whatsapp:+971504095079";
 
 const scriptSteps = [
-  "Hi there, how are you? I recently came across your CV online. My name is David and I’m contacting you on behalf of tutorii.com...",
-  "So, Tutorii.com is a subscription-based educational platform designed to empower individuals...",
-  "Right now, we’re looking to bring on new Sales Managers..."
+  "Hi there, how are you? I recently came across your CV online. My name is David and I’m contacting you on behalf of tutorii.com. We think you might be a great fit for an opportunity we’re currently offering. We are currently looking for salespeople to help the growth of our platform. Might this be something of interest to you?",
+  "So, Tutorii.com is a subscription-based educational platform designed to empower individuals with practical knowledge about life in the UAE and the wider GCC region — from protecting yourself and understanding local systems, to finding jobs and building your career. But that’s not all — as a subscriber, you also unlock the chance to earn a strong, recurring income by simply referring others. It’s a great opportunity to start your own business, take control of your future, and grow financially — all while learning skills that genuinely improve your life. Here's a short video to help you understand.",
+  "Right now, we’re looking to bring on new Sales Managers who want to grow with the platform, invite others to join, and build a solid foundation in business, leadership, and online income. Feel free to ask any question about the platform. Click on Tutorii.com to join the team."
 ];
 
 const videoLinks = {
@@ -92,7 +92,7 @@ app.post("/webhook", async (req, res) => {
       console.log("✅ Template message sent:", templateMsg.sid);
 
       // Save step progression for target
-      await saveSession(TARGET_NUMBER, { step: 1, lang: "", messages: [] });
+      await saveSession(TARGET_NUMBER, { step: 0, lang: "", messages: [] });
     } catch (error) {
       console.error("❌ Error sending template message:", error);
     }
@@ -143,19 +143,25 @@ app.post("/webhook", async (req, res) => {
     const reply = scriptSteps[step];
     messages.push({ role: "assistant", content: reply });
 
-    if (step === scriptSteps.length) {
-      const videoUrl = videoLinks[lang] || videoLinks.en;
-      await sendDelayedMessage({
-        from: FROM_NUMBER,
-        to: from,
-        body: reply + "\n\nHere’s a quick intro video:",
-        mediaUrl: [videoUrl]
-      });
-    } else {
-      await sendDelayedMessage({ from: FROM_NUMBER, to: from, body: reply });
-    }
+  if (step === scriptSteps.length - 2) {
+    // Second last step — send video + text
+    await sendDelayedMessage({
+      from: FROM_NUMBER,
+      to: from,
+      body: `${reply}\n\nHere’s a quick intro video:`,
+      mediaUrl: [videoUrl]
+    });
+  } else {
+    // Other steps — just send text
+    await sendDelayedMessage({
+      from: FROM_NUMBER,
+      to: from,
+      body: reply
+    });
+  }
 
-    await saveSession(from, { step, lang, messages });
+  step++;
+  await saveSession(from, { step, lang, messages });
     return;
   }
 
@@ -168,7 +174,7 @@ app.post("/webhook", async (req, res) => {
         messages: [
           {
             role: "system",
-            content: "You are David, a friendly recruiter for Tutorii.com..."
+            content: "You are David, a friendly recruiter for Tutorii.com. Stay on topic about Tutorii’s educational and referral website platform. Do not answer questions unrelated to Tutorii. Only list benefits from this information. Once the user shows interest , diect them to Tutorii.com so they can register or subscribe. Keep responses short, helpful, and persuasive. Never answer unrelated questions. COST & VALUE: If someone says they can’t afford it, say it’s very affordable and most people earn back the fee by referring a few others. If they mention free content, explain Tutorii is structured, focused on UAE/GCC, and includes income potential. If they ask if it’s worth it, confirm it’s a small investment with big learning and earning value. No monthly commitment—you can cancel anytime. No free trial — value unlocks with subscription. TRUST & LEGITIMACY: Tutorii is UAE-registered and licensed. Not a pyramid scheme—simple direct commissions. Transparent, with real education and support. HOW IT WORKS: Subscribe, learn, and optionally earn by referrals. Topics include life in UAE, worker rights, job hunting, money tips and access to a team of professionals. Different from YouTube—structured, focused, plus income. No selling or teaching required. TIME & COMMITMENT: Flexible, even 15 minutes per day helps. The sooner you start, the sooner you earn. EARNING & REFERRALS: Earnings depend on effort; 5 referrals can bring $100/month. Only earn while referrals stay subscribed. Weekly payouts via PayPal ; we guide setup. Commissions are 40% direct plus 5% second-level. ACCESS & LANGUAGE: Works globally, not just UAE. Content in English, Urdu, Tagalog, Hindi. Mobile-friendly, no laptop needed. LEGAL & ETHICAL: Fully allowed, doesn’t affect visas or jobs. Halal and ethical—just knowledge sharing. SKEPTICAL REPLIES: If they say they’re thinking about it, say starting now means earning sooner. If they want details later, send the link and stay available. PRICING: $19.85 US dollars/month, cancel anytime. Includes full learning access and referral tools. Always stay polite, positive, and focused on Tutorii."
           },
           ...messages
         ]
