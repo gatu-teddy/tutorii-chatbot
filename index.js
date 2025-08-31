@@ -45,6 +45,23 @@ async function sendDelayedMessage(params) {
   return client.messages.create(params);
 }
 
+//helper to send delayed message with video attached
+async function sendMediaWithText({ from, to, body, mediaUrl }) {
+  // delay once for the whole pair
+console.log(`Waiting 1 minute before sending message to ${params.to}`);
+  await delay(60000);
+
+  // send video
+console.log(`sending video without delay to &{params.to}`);
+  await client.messages.create({ from, to, mediaUrl });
+
+  // send caption text right after
+console.log(`sending text without delay to &{params.to}`);
+  if (body) {
+    await client.messages.create({ from, to, body });
+  }
+}
+
 async function getSession(id) {
   try {
     const doc = await client.sync.v1.services(process.env.SYNC_SERVICE_SID)
@@ -157,24 +174,30 @@ if (step < steps.length - 1) {
   messages.push({ role: "assistant", content: replyStep.body });
 
   // Send text first
-  await sendDelayedMessage({
-    from: FROM_NUMBER,
-    to: from,
-    body: replyStep.body
-  });
+  //await sendDelayedMessage({
+  //  from: FROM_NUMBER,
+  //  to: from,
+   // body: replyStep.body
+ // });
 
   // Send media if it exists
+let result;
   if (replyStep.mediaUrl) {
-    await sendDelayedMessage({
+    await sendMediaWithText({
       from: FROM_NUMBER,
       to: from,
-					body: replyStep.body,
-      mediaUrl: replyStep.mediaUrl
+body: replyStep.body,
+mediaUrl: replyStep.mediaUrl
     });
-  }
+  } else {
+await sendDelayedMessage({
+from: FROM_NUMBER,
+to: from,
+body: replyStep.body});
+}
 
   await saveSession(from, { step, lang, messages });
-  return;
+  return result;
 }
 
   // After script → GPT fallback
