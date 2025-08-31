@@ -150,21 +150,21 @@ app.post("/webhook", async (req, res) => {
       return;
     }
 
-    const steps = scriptSteps(lang);
-    step++;
-    const replyStep = steps[step];
-    messages.push({ role: "assistant", content: replyStep.body });
+   // const steps = scriptSteps(lang);
+   // step++;
+    //const replyStep = steps[step];
+    //messages.push({ role: "assistant", content: replyStep.body });
 
-    await sendDelayedMessage({
-      from: FROM_NUMBER,
-      to: from,
-      body: replyStep.body,
-      mediaUrl: replyStep.mediaUrl
-    });
+  //  await sendDelayedMessage({
+    //  from: FROM_NUMBER,
+    //  to: from,
+    //  body: replyStep.body,
+    //  mediaUrl: replyStep.mediaUrl
+  //  });
 
-    await saveSession(from, { step, lang, messages });
-    return;
-  }
+  //  await saveSession(from, { step, lang, messages });
+ //   return;
+ // }
 
   // Sequential script steps
 const steps = scriptSteps(lang);
@@ -186,14 +186,14 @@ let result;
     await sendMediaWithText({
       from: FROM_NUMBER,
       to: from,
-body: replyStep.body,
-mediaUrl: replyStep.mediaUrl
+      body: replyStep.body,
+      mediaUrl: replyStep.mediaUrl
     });
   } else {
-await sendDelayedMessage({
-from: FROM_NUMBER,
-to: from,
-body: replyStep.body});
+    await sendDelayedMessage({
+      from: FROM_NUMBER,
+      to: from,
+      body: replyStep.body});
 }
 
   await saveSession(from, { step, lang, messages });
