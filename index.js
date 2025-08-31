@@ -168,6 +168,7 @@ if (step < steps.length - 1) {
     await sendDelayedMessage({
       from: FROM_NUMBER,
       to: from,
+					body: replyStep.body,
       mediaUrl: replyStep.mediaUrl
     });
   }
