@@ -48,15 +48,15 @@ async function sendDelayedMessage(params) {
 //helper to send delayed message with video attached
 async function sendMediaWithText({ from, to, body, mediaUrl }) {
   // delay once for the whole pair
-console.log(`Waiting 1 minute before sending message to ${params.to}`);
+console.log(`Waiting 1 minute before sending message to ${to}`);
   await delay(60000);
 
   // send video
-console.log(`sending video without delay to &{params.to}`);
+console.log(`sending video without delay to &{to}`);
   await client.messages.create({ from, to, mediaUrl });
 
   // send caption text right after
-console.log(`sending text without delay to &{params.to}`);
+console.log(`sending text without delay to &{to}`);
   if (body) {
     await client.messages.create({ from, to, body });
   }
@@ -164,7 +164,7 @@ app.post("/webhook", async (req, res) => {
 
   //  await saveSession(from, { step, lang, messages });
  //   return;
- // }
+  }
 
   // Sequential script steps
 const steps = scriptSteps(lang);
@@ -181,7 +181,6 @@ if (step < steps.length - 1) {
  // });
 
   // Send media if it exists
-let result;
   if (replyStep.mediaUrl) {
     await sendMediaWithText({
       from: FROM_NUMBER,
@@ -197,7 +196,7 @@ let result;
 }
 
   await saveSession(from, { step, lang, messages });
-  return result;
+  return;
 }
 
   // After script → GPT fallback
@@ -235,7 +234,7 @@ let result;
       body: "🛑 Error talking to the AI. Try again later."
     });
   }
-};
+});
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
