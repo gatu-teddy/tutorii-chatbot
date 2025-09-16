@@ -40,7 +40,7 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 // Helper to send Twilio message with 1 minute delay
 async function sendDelayedMessage(params) {
   console.log(`⏳ Waiting 1 minute before sending message to ${params.to}`);
-  await delay(60000);
+  await delay(10000);
   console.log(`✉️ Sending message to ${params.to}`);
   return client.messages.create(params);
 }
@@ -49,7 +49,7 @@ async function sendDelayedMessage(params) {
 async function sendMediaWithText({ from, to, body, mediaUrl }) {
   // delay once for the whole pair
 console.log(`Waiting 1 minute before sending message to ${to}`);
-  await delay(60000);
+  await delay(10000);
 
   // send video
 console.log(`sending video without delay to &{to}`);
@@ -97,6 +97,7 @@ function shouldInterruptForGpt(message) {
 }
 
 async function maybeInterruptWithGpt(from, body, session, timeSinceLast) {
+const {step, lang,messages} = session;
   // Ignore tiny corrections if very quick (typo fixes)
   if (body.length <= 4 && timeSinceLast < 5000) {
     console.log("✏️ Short correction detected — continuing steps.");
@@ -105,14 +106,14 @@ async function maybeInterruptWithGpt(from, body, session, timeSinceLast) {
 
   if (shouldInterruptForGpt(body)) {
     console.log("⚡ Interrupt detected — falling back to GPT.");
-    await handleGptFallback(from, body, session);
+    await handleGptFallback(from, body, session, lang);
     return true; // stop script
   }
   return false; // continue steps
 }
 
   // After script → GPT fallback
-  async function handleGptFallback(from, body, session) {
+  async function handleGptFallback(from, body, session, lang) {
   try {
     const gptRes = await axios.post(
       "https://openrouter.ai/api/v1/chat/completions",
@@ -121,7 +122,7 @@ async function maybeInterruptWithGpt(from, body, session, timeSinceLast) {
         messages: [
           {
             role: "system",
-            content: "You are David, a friendly recruiter for Tutorii.com. Stay on topic..."
+            content: `You are David, a friendly recruiter for Tutorii.com. Stay on topic. Respond in ${lang || "English"}`
           },
           ...session.messages,
           { role: "user", content: body }
@@ -194,6 +195,15 @@ app.post("/webhook", async (req, res) => {
   }
 
   messages.push({ role: "user", content: body });
+ // detect language
+  if (step === 0) {
+    const lower = body.toLowerCase();
+    if (lower.includes("english") || lower.includes("eng")) lang = "en";
+    else if (lower.includes("urdu") || lower.includes("اردو")) lang = "ur";
+    else if (lower.includes("hindi") || lower.includes("हिन्दी")) lang = "hi";
+    else if (lower.includes("filipino") || lower.includes("pilipino") || lower.includes("tagalog")) lang = "tl";
+    else lang = null; //not yet recognised
+    
   const now = Date.now();
   const timeSinceLast = now - (messages.lastMessageTime || 0);
   messages.lastMessageTime = now;
@@ -201,14 +211,8 @@ app.post("/webhook", async (req, res) => {
   const interrupted = await maybeInterruptWithGpt(from, body, { step, lang, messages }, timeSinceLast);
   if (interrupted) return;
 
-  // Language selection step
-  if (step === 0) {
-    const lower = body.toLowerCase();
-    if (lower.includes("english") || lower.includes("eng")) lang = "en";
-    else if (lower.includes("urdu") || lower.includes("اردو")) lang = "ur";
-    else if (lower.includes("hindi") || lower.includes("हिन्दी")) lang = "hi";
-    else if (lower.includes("filipino") || lower.includes("pilipino") || lower.includes("tagalog")) lang = "tl";
-    else {
+  // Language selection if not recognised
+  if (!lang) {
       await sendDelayedMessage({
         from: FROM_NUMBER,
         to: from,
@@ -234,19 +238,10 @@ app.post("/webhook", async (req, res) => {
   }
 
   // Sequential script steps
+step++;
 const steps = scriptSteps(lang);
-if (step < steps.length - 1) {
-  step++;
-  const replyStep = steps[step];
-  messages.push({ role: "assistant", content: replyStep.body });
-
-  // Send text first
-  //await sendDelayedMessage({
-  //  from: FROM_NUMBER,
-  //  to: from,
-   // body: replyStep.body
- // });
-
+const replyStep = steps[step];
+messages.push({ role: "assistant", content: replyStep.body });
   // Send media if it exists
   if (replyStep.mediaUrl) {
     await sendMediaWithText({
@@ -264,7 +259,6 @@ if (step < steps.length - 1) {
 
   await saveSession(from, { step, lang, messages });
   return;
-}
 
 });
 
