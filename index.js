@@ -9,7 +9,7 @@ app.use(express.json());
 const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 
 const ADMIN_NUMBER = "whatsapp:+971567728465";
-const TARGET_NUMBER = "whatsapp:+447826939737";
+const TARGET_NUMBER = "whatsapp:+971589097795";
 const TRIGGER_KEYWORD = "trigger max";
 const CONTENT_SID = "HX034d351d1041ce22cd971eb3be6efad3";
 const FROM_NUMBER = "whatsapp:+971504095079";
@@ -89,6 +89,29 @@ async function saveSession(id, data) {
   }
 }
 
+function shouldInterruptForGpt(message) {
+  const lower = message.toLowerCase();
+  const gptKeywords = ["how", "what", "where", "when", "can i", "join", "subscribe", "details","tell me", "info", "price", "cost", "earn", "money", "trial"
+    ];
+  return gptKeywords.some(keyword => lower.includes(keyword)) || lower.endsWith("?");
+}
+
+async function maybeInterruptWithGpt(from, body, session, timeSinceLast) {
+  // Ignore tiny corrections if very quick (typo fixes)
+  if (body.length <= 4 && timeSinceLast < 5000) {
+    console.log("✏️ Short correction detected — continuing steps.");
+    return false;
+  }
+
+  if (shouldInterruptForGpt(body)) {
+    console.log("⚡ Interrupt detected — falling back to GPT.");
+    await handleGptFallback(from, body, session);
+    return true; // stop script
+  }
+  return false; // continue steps
+}
+
+
 app.post("/webhook", async (req, res) => {
   console.log("📩 Incoming webhook from Twilio");
 
@@ -133,6 +156,12 @@ app.post("/webhook", async (req, res) => {
   }
 
   messages.push({ role: "user", content: body });
+  const now = Date.now();
+  const timeSinceLast = now - (messages.lastMessageTime || 0);
+  messages.lastMessageTime = now;
+
+  const interrupted = await maybeInterruptWithGpt(from, body, { step, lang, messages }, timeSinceLast);
+  if (interrupted) return;
 
   // Language selection step
   if (step === 0) {
@@ -200,6 +229,7 @@ if (step < steps.length - 1) {
 }
 
   // After script → GPT fallback
+  async function handleGptFallback(from, body, session) {
   try {
     const gptRes = await axios.post(
       "https://openrouter.ai/api/v1/chat/completions",
@@ -208,9 +238,10 @@ if (step < steps.length - 1) {
         messages: [
           {
             role: "system",
-            content: "You are David, a friendly recruiter for Tutorii.com. Stay on topic about Tutorii’s educational and referral website platform. Do not answer questions unrelated to Tutorii. Only list benefits from this information. Once the user shows interest , diect them to Tutorii.com so they can register or subscribe. Keep responses short, helpful, and persuasive. Never answer unrelated questions. COST & VALUE: If someone says they can’t afford it, say it’s very affordable and most people earn back the fee by referring a few others. If they mention free content, explain Tutorii is structured, focused on UAE/GCC, and includes income potential. If they ask if it’s worth it, confirm it’s a small investment with big learning and earning value. No monthly commitment—you can cancel anytime. No free trial—value unlocks with subscription. TRUST & LEGITIMACY: Tutorii is UAE-registered and licensed. Not a pyramid scheme—simple direct commissions. Transparent, with real education and support. HOW IT WORKS: Subscribe, learn, and optionally earn by referrals. Topics include life in UAE, worker rights, job hunting, money tips. Different from YouTube—structured, focused, plus income. No selling or teaching required. TIME & COMMITMENT: Flexible, even 15 minutes per day helps. The sooner you start, the sooner you earn. EARNING & REFERRALS: Earnings depend on effort; 5 referrals can bring $100/month. Only earn while referrals stay subscribed. Weekly payouts via Stripe; we guide setup. Commissions are 40% direct plus 5% second-level. ACCESS & LANGUAGE: Works globally, not just UAE. Content in English, Urdu, Tagalog, Hindi. Mobile-friendly, no laptop needed. LEGAL & ETHICAL: Fully allowed, doesn’t affect visas or jobs. Halal and ethical—just knowledge sharing. SKEPTICAL REPLIES: If they say they’re thinking about it, say starting now means earning sooner. If they want details later, send the link and stay available. PRICING: $19.85 US dollars/month, cancel anytime. Includes full learning access and referral tools. Always stay polite, positive, and focused on Tutorii."
+            content: "You are David, a friendly recruiter for Tutorii.com. Stay on topic..."
           },
-          ...messages
+          ...session.messages,
+          { role: "user", content: body }
         ]
       },
       {
@@ -222,8 +253,8 @@ if (step < steps.length - 1) {
     );
 
     const gptReply = gptRes.data.choices?.[0]?.message?.content || "⚠️ No response from AI.";
-    messages.push({ role: "assistant", content: gptReply });
-    await saveSession(from, { step, lang, messages });
+    session.messages.push({ role: "assistant", content: gptReply });
+    await saveSession(from, session);
 
     await sendDelayedMessage({ from: FROM_NUMBER, to: from, body: gptReply });
   } catch (err) {
@@ -234,6 +265,7 @@ if (step < steps.length - 1) {
       body: "🛑 Error talking to the AI. Try again later."
     });
   }
+}
 });
 
 const PORT = process.env.PORT || 3000;
