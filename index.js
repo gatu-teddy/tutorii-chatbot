@@ -111,6 +111,44 @@ async function maybeInterruptWithGpt(from, body, session, timeSinceLast) {
   return false; // continue steps
 }
 
+  // After script → GPT fallback
+  async function handleGptFallback(from, body, session) {
+  try {
+    const gptRes = await axios.post(
+      "https://openrouter.ai/api/v1/chat/completions",
+      {
+        model: "mistralai/mistral-small-3.2-24b-instruct",
+        messages: [
+          {
+            role: "system",
+            content: "You are David, a friendly recruiter for Tutorii.com. Stay on topic..."
+          },
+          ...session.messages,
+          { role: "user", content: body }
+        ]
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.GPT_API_KEY}`,
+          "Content-Type": "application/json"
+        }
+      }
+    );
+
+    const gptReply = gptRes.data.choices?.[0]?.message?.content || "⚠️ No response from AI.";
+    session.messages.push({ role: "assistant", content: gptReply });
+    await saveSession(from, session);
+
+    await sendDelayedMessage({ from: FROM_NUMBER, to: from, body: gptReply });
+  } catch (err) {
+    console.error("❌ GPT API error:", err.response?.data || err.message);
+    await sendDelayedMessage({
+      from: FROM_NUMBER,
+      to: from,
+      body: "🛑 Error talking to the AI. Try again later."
+    });
+  }
+}
 
 app.post("/webhook", async (req, res) => {
   console.log("📩 Incoming webhook from Twilio");
@@ -228,44 +266,6 @@ if (step < steps.length - 1) {
   return;
 }
 
-  // After script → GPT fallback
-  async function handleGptFallback(from, body, session) {
-  try {
-    const gptRes = await axios.post(
-      "https://openrouter.ai/api/v1/chat/completions",
-      {
-        model: "mistralai/mistral-small-3.2-24b-instruct",
-        messages: [
-          {
-            role: "system",
-            content: "You are David, a friendly recruiter for Tutorii.com. Stay on topic..."
-          },
-          ...session.messages,
-          { role: "user", content: body }
-        ]
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${process.env.GPT_API_KEY}`,
-          "Content-Type": "application/json"
-        }
-      }
-    );
-
-    const gptReply = gptRes.data.choices?.[0]?.message?.content || "⚠️ No response from AI.";
-    session.messages.push({ role: "assistant", content: gptReply });
-    await saveSession(from, session);
-
-    await sendDelayedMessage({ from: FROM_NUMBER, to: from, body: gptReply });
-  } catch (err) {
-    console.error("❌ GPT API error:", err.response?.data || err.message);
-    await sendDelayedMessage({
-      from: FROM_NUMBER,
-      to: from,
-      body: "🛑 Error talking to the AI. Try again later."
-    });
-  }
-}
 });
 
 const PORT = process.env.PORT || 3000;
