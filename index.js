@@ -208,9 +208,6 @@ app.post("/webhook", async (req, res) => {
   const timeSinceLast = now - (messages.lastMessageTime || 0);
   messages.lastMessageTime = now;
 
-  const interrupted = await maybeInterruptWithGpt(from, body, { step, lang, messages }, timeSinceLast);
-  if (interrupted) return;
-
   // Language selection if not recognised
   if (!lang) {
       await sendDelayedMessage({
@@ -218,25 +215,14 @@ app.post("/webhook", async (req, res) => {
         to: from,
         body: "❌ Sorry, that's not a supported language. Please reply with English, Pilipino, اردو, or हिन्दी."
       });
-      return;
+       // Save session with step 0 so user can try again
+    await saveSession(from, { step: 0, lang: null, messages });
+    return; // exit here, wait for next reply
     }
-
-   // const steps = scriptSteps(lang);
-   // step++;
-    //const replyStep = steps[step];
-    //messages.push({ role: "assistant", content: replyStep.body });
-
-  //  await sendDelayedMessage({
-    //  from: FROM_NUMBER,
-    //  to: from,
-    //  body: replyStep.body,
-    //  mediaUrl: replyStep.mediaUrl
-  //  });
-
-  //  await saveSession(from, { step, lang, messages });
- //   return;
   }
 
+  const interrupted = await maybeInterruptWithGpt(from, body, { step, lang, messages }, timeSinceLast);
+if (interrupted) return;
   // Sequential script steps
 step++;
 const steps = scriptSteps(lang);
