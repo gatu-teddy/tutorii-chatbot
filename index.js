@@ -195,6 +195,10 @@ app.post("/webhook", async (req, res) => {
   }
 
   messages.push({ role: "user", content: body });
+  const now = Date.now();
+  const timeSinceLast = now - (messages.lastMessageTime || 0);
+  messages.lastMessageTime = now;
+  
  // detect language
   if (step === 0) {
     const lower = body.toLowerCase();
@@ -204,9 +208,7 @@ app.post("/webhook", async (req, res) => {
     else if (lower.includes("filipino") || lower.includes("pilipino") || lower.includes("tagalog")) lang = "tl";
     else lang = null; //not yet recognised
     
-  const now = Date.now();
-  const timeSinceLast = now - (messages.lastMessageTime || 0);
-  messages.lastMessageTime = now;
+  
 
   // Language selection if not recognised
   if (!lang) {
