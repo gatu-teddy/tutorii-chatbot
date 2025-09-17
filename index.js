@@ -202,7 +202,7 @@ app.post("/webhook", async (req, res) => {
  // detect language
   if (step === 0) {
     const lower = body.toLowerCase();
-    if (lower.includes("english") || lower.includes("eng")) || lower.includes("engl")) lang = "en";
+    if (lower.includes("english") || lower.includes("eng") || lower.includes("engl")) lang = "en";
     else if (lower.includes("urdu") || lower.includes("اردو")) lang = "ur";
     else if (lower.includes("hindi") || lower.includes("हिन्दी")) lang = "hi";
     else if (lower.includes("filipino") || lower.includes("pilipino") || lower.includes("tagalog")) lang = "tl";
