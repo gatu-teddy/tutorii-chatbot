@@ -9,7 +9,7 @@ app.use(express.json());
 const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 
 const ADMIN_NUMBER = "whatsapp:+971567728465";
-const TARGET_NUMBER = "whatsapp:+971589097795";
+const TARGET_NUMBER = "whatsapp:+447826939737";
 const TRIGGER_KEYWORD = "trigger max";
 const CONTENT_SID = "HX034d351d1041ce22cd971eb3be6efad3";
 const FROM_NUMBER = "whatsapp:+971504095079";
@@ -202,7 +202,7 @@ app.post("/webhook", async (req, res) => {
  // detect language
   if (step === 0) {
     const lower = body.toLowerCase();
-    if (lower.includes("english") || lower.includes("eng")) lang = "en";
+    if (lower.includes("english") || lower.includes("eng")) || lower.includes("engl")) lang = "en";
     else if (lower.includes("urdu") || lower.includes("اردو")) lang = "ur";
     else if (lower.includes("hindi") || lower.includes("हिन्दी")) lang = "hi";
     else if (lower.includes("filipino") || lower.includes("pilipino") || lower.includes("tagalog")) lang = "tl";
