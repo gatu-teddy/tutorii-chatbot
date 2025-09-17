@@ -9,7 +9,7 @@ app.use(express.json());
 const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 
 const ADMIN_NUMBER = "whatsapp:+971567728465";
-const TARGET_NUMBER = "whatsapp:+447826939737";
+const TARGET_NUMBER = "whatsapp:+971589097795";
 const TRIGGER_KEYWORD = "trigger max";
 const CONTENT_SID = "HX034d351d1041ce22cd971eb3be6efad3";
 const FROM_NUMBER = "whatsapp:+971504095079";
