@@ -237,7 +237,7 @@ app.post("/webhook", async (req, res) => {
       console.error("Fatal error in admin trigger:", error.message || error);
     }
 
-    return: //exit for admin trigger
+    return; //exit for admin trigger
   }
 
   // Reset session
