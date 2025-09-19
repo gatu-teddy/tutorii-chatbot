@@ -2,6 +2,11 @@ import express from "express";
 import twilio from "twilio";
 import axios from "axios";
 
+import fs from "fs";
+import path from "path";
+
+const contactsPath = path.join(process.cwd(), "Contacts.json"); // same folder as db.js
+
 const app = express();
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
@@ -167,20 +172,72 @@ app.post("/webhook", async (req, res) => {
 
   // Admin trigger → send template after 1 minute
   if (from === ADMIN_NUMBER && body.toLowerCase().includes(TRIGGER_KEYWORD)) {
+    
     console.log("🚀 Admin trigger detected — sending template message with delay");
-    try {
-      const templateMsg = await sendDelayedMessage({
-        from: FROM_NUMBER,
-        to: TARGET_NUMBER,
-        contentSid: CONTENT_SID
-      });
-      console.log("✅ Template message sent:", templateMsg.sid);
+    
+    //try {
+    //  const templateMsg = await sendDelayedMessage({
+    //    from: FROM_NUMBER,
+    //    to: TARGET_NUMBER,
+    //    contentSid: CONTENT_SID
+    //  });
+    //  console.log("✅ Template message sent:", templateMsg.sid);
 
-      await saveSession(TARGET_NUMBER, { step: 0, lang: "", messages: [] });
+    //  await saveSession(TARGET_NUMBER, { step: 0, lang: "", messages: [] });
+    //} catch (error) {
+    //  console.error("❌ Error sending template message:", error);
+    //}
+    //return;
+
+    try {
+      //1. load Contacts.json
+      console.log("Reading Contacts.json");
+      const rawData = fs.readFileSync(contactsPath, "utf-8");
+      let contacts = JSON.parse(rawData);
+      console.log(`Total contacts loaded; ${contacts.length}`);
+
+      //2. Filter pending contacts
+      const pendingContacts = contacts.filter(c=> c.status === "pending");
+      console.log(`pending contacts to send: ${pendingContacts.length}`);
+
+      for (let contact of pendingContacts) {
+        try {
+          console.log(`attempting to send to ${contact.number}...`);
+
+          //3.Send template message
+          await sendDelayedMessage({
+            from: FROM_NUMBER,
+            to: contact.number,
+            contentSid: CONTENT_SID
+          });
+
+          //4. Mark as sent in contacts
+          contact.status = "sent";
+          contact.last_attempt = new Date().toISOString();
+          console.log(`Successfully sent to ${contact.number}`);
+        } catch (err) {
+          //5. handle failed send
+          contact.status = "failed";
+          contact.last_attempt = new Date().toISOString();
+          console.error(`failed to send to ${contact.number}`);
+          console.error("Error details:", err.message || err);
+        }
+
+        //6.save json after each attempt
+        try {
+          fs.writeFileSync(contactsPath, JSON.stringify(contacts, null,2));
+          console.log(`contacts.json updated after ${contact.number}`);
+        } catch (writeErr) {
+          console.error("Failed o update contacts.json", writeErr.message || writeErr);
+        }
+      }
+
+      console.log("admin trigger finished - all pending contacts processed");
     } catch (error) {
-      console.error("❌ Error sending template message:", error);
+      console.error("Fatal error in admin trigger:", error.message || error);
     }
-    return;
+
+    return: //exit for admin trigger
   }
 
   // Reset session
