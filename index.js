@@ -215,6 +215,11 @@ app.post("/webhook", async (req, res) => {
           contact.status = "sent";
           contact.last_attempt = new Date().toISOString();
           console.log(`Successfully sent to ${contact.number}`);
+
+          //4.1. reset session for this contact
+          await saveSession(contact.number, {step: 0, lang: "", messages: [] });
+          console.log(`session reset for ${contact.number}`);
+          
         } catch (err) {
           //5. handle failed send
           contact.status = "failed";
@@ -228,7 +233,7 @@ app.post("/webhook", async (req, res) => {
           fs.writeFileSync(contactsPath, JSON.stringify(contacts, null,2));
           console.log(`contacts.json updated after ${contact.number}`);
         } catch (writeErr) {
-          console.error("Failed o update contacts.json", writeErr.message || writeErr);
+          console.error("Failed to update contacts.json", writeErr.message || writeErr);
         }
       }
 
