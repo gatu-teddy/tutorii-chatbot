@@ -1,0 +1,9 @@
+import pkg from "pg";
+const { Pool } = pkg;
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL_INTERNAL || process.env.DATABASE_URL_EXTERNAL,
+  ssl: { rejectUnauthorized: false } // required for Render
+});
+
+export default pool;
