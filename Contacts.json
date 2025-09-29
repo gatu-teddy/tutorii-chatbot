@@ -8,5 +8,10 @@
     "number": "whatsapp:+971567728465",
     "status": "pending",
     "last_attempt": null
+  },
+  {
+    "number": "whatsapp:+447826939737",
+    "status": "pending",
+    "last_attempt": null
   }
 ]
