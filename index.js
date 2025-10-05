@@ -9,7 +9,7 @@ app.use(express.json());
 const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 
 const ADMIN_NUMBER = "whatsapp:+971567728465";
-const TARGET_NUMBER = "whatsapp:+447826939737";
+const TARGET_NUMBER = "whatsapp:+97156778465";
 const TRIGGER_KEYWORD = "trigger max";
 const CONTENT_SID = "HX034d351d1041ce22cd971eb3be6efad3";
 const FROM_NUMBER = "whatsapp:+971504095079";
@@ -212,11 +212,30 @@ app.post("/webhook", async (req, res) => {
 
   // Language selection if not recognised
   if (!lang) {
-      await sendDelayedMessage({
-        from: FROM_NUMBER,
-        to: from,
-        body: "❌ Sorry, that's not a supported language. Please reply with English, Pilipino, اردو, or हिन्दी."
-      });
+      await client.messages.create({
+  from: FROM_NUMBER,
+  to: from,
+  interactive: {
+    type: "list",
+    body: {
+      text: "🌍 Please select your preferred language to continue:"
+    },
+    action: {
+      button: "Select Language",
+      sections: [
+        {
+          title: "Available Languages",
+          rows: [
+            { id: "lang_en", title: "English" },
+            { id: "lang_ur", title: "اردو (Urdu)" },
+            { id: "lang_hi", title: "हिन्दी (Hindi)" },
+            { id: "lang_tl", title: "Filipino / Tagalog" }
+          ]
+        }
+      ]
+    }
+  }
+});
        // Save session with step 0 so user can try again
     await saveSession(from, { step: 0, lang: null, messages });
     return; // exit here, wait for next reply
