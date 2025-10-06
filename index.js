@@ -11,7 +11,7 @@ const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TO
 const ADMIN_NUMBER = "whatsapp:+971567728465";
 const TARGET_NUMBER = "whatsapp:+971567728465";
 const TRIGGER_KEYWORD = "trigger max";
-const CONTENT_SID = "HX034d351d1041ce22cd971eb3be6efad3";
+const CONTENT_SID = "HXaf07c7d57e01430acc4d264c941a130c";
 const FROM_NUMBER = "whatsapp:+971504095079";
 
 const videoLinks = {
