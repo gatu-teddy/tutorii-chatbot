@@ -11,7 +11,7 @@ const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TO
 const ADMIN_NUMBER = "whatsapp:+971567728465";
 const TARGET_NUMBER = "whatsapp:+971567728465";
 const TRIGGER_KEYWORD = "trigger max";
-const CONTENT_SID = "HXaf07c7d57e01430acc4d264c941a130c";
+const CONTENT_SID = "HX10d4b7df2f013a450a7aba22ead93f25";
 const FROM_NUMBER = "whatsapp:+971504095079";
 
 const videoLinks = {
@@ -183,6 +183,45 @@ app.post("/webhook", async (req, res) => {
     return;
   }
 
+// Handle quick reply or list picker
+  if (interactiveType === "button") {
+    if (interactiveReply === "lang_eng") {
+      lang = "en";
+    } else if (interactiveReply === "lang_pick") {
+      // send list picker
+      try {
+        await client.messages.create({
+          from: FROM_NUMBER,
+          to: from,
+          interactive: {
+            type: "list",
+            body: { text: "🌍 Please select your preferred language to continue:" },
+            action: {
+              button: "Select Language",
+              sections: [
+                { title: "Available Languages", rows: [
+                  { id: "lang_en", title: "English" },
+                  { id: "lang_ur", title: "اردو (Urdu)" },
+                  { id: "lang_hi", title: "हिन्दी (Hindi)" },
+                  { id: "lang_tl", title: "Filipino / Tagalog" }
+                ]}
+              ]
+            }
+          }
+        });
+        await saveSession(from, { step, lang: null, messages });
+      } catch (err) {
+        console.error("❌ Failed sending language list:", err);
+      }
+      return; // wait for list selection
+    }
+  } else if (interactiveType === "list") {
+    if (interactiveReply === "lang_en") lang = "en";
+    else if (interactiveReply === "lang_ur") lang = "ur";
+    else if (interactiveReply === "lang_hi") lang = "hi";
+    else if (interactiveReply === "lang_tl") lang = "tl";
+  }
+  
   // Reset session
   if (body.toLowerCase() === "reset") {
     await saveSession(from, { step: 0, lang: "", messages: [] });
@@ -199,50 +238,11 @@ app.post("/webhook", async (req, res) => {
   const timeSinceLast = now - (messages.lastMessageTime || 0);
   messages.lastMessageTime = now;
   
- // detect language
-  if (step === 0) {
-    const lower = body.toLowerCase();
-    if (lower.includes("english") || lower.includes("eng") || lower.includes("engl")) lang = "en";
-    else if (lower.includes("urdu") || lower.includes("اردو")) lang = "ur";
-    else if (lower.includes("hindi") || lower.includes("हिन्दी")) lang = "hi";
-    else if (lower.includes("filipino") || lower.includes("pilipino") || lower.includes("tagalog")) lang = "tl";
-    else lang = null; //not yet recognised
-    
-  
-
-  // Language selection if not recognised
-  if (!lang) {
-      await client.messages.create({
-  from: FROM_NUMBER,
-  to: from,
-  interactive: {
-    type: "list",
-    body: {
-      text: "🌍 Please select your preferred language to continue:"
-    },
-    action: {
-      button: "Select Language",
-      sections: [
-        {
-          title: "Available Languages",
-          rows: [
-            { id: "lang_en", title: "English" },
-            { id: "lang_ur", title: "اردو (Urdu)" },
-            { id: "lang_hi", title: "हिन्दी (Hindi)" },
-            { id: "lang_tl", title: "Filipino / Tagalog" }
-          ]
-        }
-      ]
-    }
-  }
-});
        // Save session with step 0 so user can try again
     await saveSession(from, { step: 0, lang: null, messages });
-    return; // exit here, wait for next reply
-    }
-  }
 
-  const interrupted = await maybeInterruptWithGpt(from, body, { step, lang, messages }, timeSinceLast);
+       // Save session with step 0 so user can try again
+   const interrupted = await maybeInterruptWithGpt(from, body, { step, lang, messages }, timeSinceLast);
 if (interrupted) return;
   // Sequential script steps
 step++;
