@@ -224,6 +224,9 @@ app.post("/webhook", async (req, res) => {
     else if (interactiveReply === "lang_ur") lang = "ur";
     else if (interactiveReply === "lang_hi") lang = "hi";
     else if (interactiveReply === "lang_tl") lang = "tl";
+
+    //now the step continues
+    step++;
   }
   
   // Reset session
