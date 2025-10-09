@@ -247,6 +247,10 @@ if (req.body.Interactive) {
     step = 1; // start script after language is chosen
   }
 }
+  if (!lang) {
+    console.log("waiting for language selection...");
+    return;
+  }
   
   // Reset session
   if (body.toLowerCase() === "reset") {
@@ -273,7 +277,6 @@ if (interrupted) return;
 const steps = scriptSteps(lang);
 const replyStep = steps[step];
 messages.push({ role: "assistant", content: replyStep.body });
-
   
   // Send media if it exists
   if (replyStep.mediaUrl) {
