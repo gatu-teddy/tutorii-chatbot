@@ -160,6 +160,10 @@ app.post("/webhook", async (req, res) => {
   console.log(`📨 From: ${from}`);
   console.log(`💬 Body: ${body}`);
 
+  // interactive fields
+  const interactiveType = req.body.Interactive?.type;
+  const interactiveReply = req.body.Interactive?.button_reply?.id || req.body.Interactive?.list_reply?.id;
+  
   // Respond immediately to avoid Twilio timeout
   res.type("text/xml").send("<Response></Response>");
 
