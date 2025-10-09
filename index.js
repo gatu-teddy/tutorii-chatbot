@@ -188,47 +188,65 @@ app.post("/webhook", async (req, res) => {
   }
 
 // Handle quick reply or list picker
-  if (interactiveType === "button") {
+  // Handle quick reply (button) or list picker (list)
+if (req.body.Interactive) {
+  const interactive = req.body.Interactive;
+  const interactiveType = interactive.Type;
+
+  if (interactiveType === "button_reply") {
+    const interactiveReply = interactive.ButtonReply.Id;
+
     if (interactiveReply === "lang_eng") {
       lang = "en";
+      step = 1;
+      console.log("✅ English selected, proceeding with script");
     } else if (interactiveReply === "lang_pick") {
-      // send list picker
+      // Send list picker
       try {
         await client.messages.create({
           from: FROM_NUMBER,
           to: from,
           interactive: {
             type: "list",
-            body: { text: "🌍 Please select your preferred language to continue:" },
+            body: {
+              text: "🌍 Please select your preferred language to continue:"
+            },
             action: {
               button: "Select Language",
               sections: [
-                { title: "Available Languages", rows: [
-                  { id: "lang_en", title: "English" },
-                  { id: "lang_ur", title: "اردو (Urdu)" },
-                  { id: "lang_hi", title: "हिन्दी (Hindi)" },
-                  { id: "lang_tl", title: "Filipino / Tagalog" }
-                ]}
+                {
+                  title: "Available Languages",
+                  rows: [
+                    { id: "lang_en", title: "English" },
+                    { id: "lang_ur", title: "اردو (Urdu)" },
+                    { id: "lang_hi", title: "हिन्दी (Hindi)" },
+                    { id: "lang_tl", title: "Filipino / Tagalog" }
+                  ]
+                }
               ]
             }
           }
         });
+        console.log("✅ Language list sent");
         await saveSession(from, { step, lang: null, messages });
       } catch (err) {
         console.error("❌ Failed sending language list:", err);
       }
-      return; // wait for list selection
+      return; // stop here — wait for user to pick
     }
-  } else if (interactiveType === "list") {
+
+  } else if (interactiveType === "list_reply") {
+    const interactiveReply = interactive.ListReply.Id;
+
     if (interactiveReply === "lang_en") lang = "en";
     else if (interactiveReply === "lang_ur") lang = "ur";
     else if (interactiveReply === "lang_hi") lang = "hi";
     else if (interactiveReply === "lang_tl") lang = "tl";
 
-    //now the step continues
-    console.log(`language selected: ${lang}`);
-    step = 1; //start script
+    console.log(`✅ Language selected: ${lang}`);
+    step = 1; // start script after language is chosen
   }
+}
   
   // Reset session
   if (body.toLowerCase() === "reset") {
