@@ -241,13 +241,11 @@ app.post("/webhook", async (req, res) => {
     return;
   }
 
+  //track time and update messages
   messages.push({ role: "user", content: body });
   const now = Date.now();
   const timeSinceLast = now - (messages.lastMessageTime || 0);
   messages.lastMessageTime = now;
-  
-       // Save session with step 0 so user can try again
-    await saveSession(from, { step: 0, lang: null, messages });
 
        // Save session with step 0 so user can try again
    const interrupted = await maybeInterruptWithGpt(from, body, { step, lang, messages }, timeSinceLast);
@@ -276,10 +274,13 @@ messages.push({ role: "assistant", content: replyStep.body });
     }
   step ++;
   await saveSession(from, { step, lang, messages });
+
+  //check if script completed and start fallbackGPT
+  if (step >= steps.length){
+    console.log ("Script completed for this user");
+    await handleGptFallBack (from, body, session, lang);
+  }
   return;
-} else {
-  console.log("script completed for this user hehe")
-}
 });
 
 const PORT = process.env.PORT || 3000;
