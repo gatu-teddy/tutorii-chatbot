@@ -226,7 +226,8 @@ app.post("/webhook", async (req, res) => {
     else if (interactiveReply === "lang_tl") lang = "tl";
 
     //now the step continues
-    step++;
+    console.log(`language selected: ${lang}`);
+    step = 1; //start script
   }
   
   // Reset session
@@ -251,11 +252,13 @@ app.post("/webhook", async (req, res) => {
        // Save session with step 0 so user can try again
    const interrupted = await maybeInterruptWithGpt(from, body, { step, lang, messages }, timeSinceLast);
 if (interrupted) return;
+  
   // Sequential script steps
-step++;
 const steps = scriptSteps(lang);
 const replyStep = steps[step];
 messages.push({ role: "assistant", content: replyStep.body });
+
+  
   // Send media if it exists
   if (replyStep.mediaUrl) {
     await sendMediaWithText({
@@ -268,12 +271,15 @@ messages.push({ role: "assistant", content: replyStep.body });
     await sendDelayedMessage({
       from: FROM_NUMBER,
       to: from,
-      body: replyStep.body});
-}
-
+      body: replyStep.body
+      });
+    }
+  step ++;
   await saveSession(from, { step, lang, messages });
   return;
-
+} else {
+  console.log("script completed for this user hehe")
+}
 });
 
 const PORT = process.env.PORT || 3000;
