@@ -217,27 +217,6 @@ if (buttonText === "Proceed in English") {
   return; // pause here
 }
 
-        } catch (err) {
-          console.error("❌ Failed sending language list:", err);
-        }
-
-        return; // pause script until language selected
-      }
-
-    } else if (interactiveType === "list_reply") {
-      const interactiveReply = interactive.ListReply.Id;
-
-      if (interactiveReply === "lang_en") lang = "en";
-      else if (interactiveReply === "lang_ur") lang = "ur";
-      else if (interactiveReply === "lang_hi") lang = "hi";
-      else if (interactiveReply === "lang_tl") lang = "tl";
-
-      console.log(`✅ Language selected: ${lang}`);
-      step = 1; // start script after language is chosen
-      await saveSession(from, { step, lang, messages });
-    }
-  }
-
   // --- Pause script if language not selected ---
   if (!lang) {
     console.log("⏳ Waiting for user to select language...");
