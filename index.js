@@ -152,107 +152,102 @@ const {step, lang,messages} = session;
 }
 
 app.post("/webhook", async (req, res) => {
-  console.log("📩 Incoming webhook from Twilio");
-
   const from = req.body.From?.trim();
   const body = (req.body.Body || "").trim();
 
-  console.log(`📨 From: ${from}`);
-  console.log(`💬 Body: ${body}`);
-
-  // interactive fields
-  const interactiveType = req.body.Interactive?.type;
-  const interactiveReply = req.body.Interactive?.button_reply?.id || req.body.Interactive?.list_reply?.id;
-  
   // Respond immediately to avoid Twilio timeout
   res.type("text/xml").send("<Response></Response>");
 
+  // Load session
   let { step, lang, messages } = await getSession(from);
 
-  // Admin trigger → send template after 1 minute
+  // --- Admin trigger: send template message ---
   if (from === ADMIN_NUMBER && body.toLowerCase().includes(TRIGGER_KEYWORD)) {
     console.log("🚀 Admin trigger detected — sending template message with delay");
     try {
-      const templateMsg = await sendDelayedMessage({
+      await sendDelayedMessage({
         from: FROM_NUMBER,
         to: TARGET_NUMBER,
         contentSid: CONTENT_SID
       });
-      console.log("✅ Template message sent:", templateMsg.sid);
-
+      console.log("✅ Template message sent");
       await saveSession(TARGET_NUMBER, { step: 0, lang: "", messages: [] });
-    } catch (error) {
-      console.error("❌ Error sending template message:", error);
+    } catch (err) {
+      console.error("❌ Error sending template message:", err);
     }
     return;
   }
 
-// Handle quick reply or list picker
-  // Handle quick reply (button) or list picker (list)
-if (req.body.Interactive) {
-  const interactive = req.body.Interactive;
-  const interactiveType = interactive.Type;
+  // --- Handle quick reply or list selection ---
+  if (req.body.Interactive) {
+    const interactive = req.body.Interactive;
+    const interactiveType = interactive.Type; // "button_reply" or "list_reply"
 
-  if (interactiveType === "button_reply") {
-    const interactiveReply = interactive.ButtonReply.Id;
+    if (interactiveType === "button_reply") {
+      const interactiveReply = interactive.ButtonReply.Id;
 
-    if (interactiveReply === "lang_eng") {
-      lang = "en";
-      step = 1;
-      console.log("✅ English selected, proceeding with script");
-    } else if (interactiveReply === "lang_pick") {
-      // Send list picker
-      try {
-        await client.messages.create({
-          from: FROM_NUMBER,
-          to: from,
-          interactive: {
-            type: "list",
-            body: {
-              text: "🌍 Please select your preferred language to continue:"
-            },
-            action: {
-              button: "Select Language",
-              sections: [
-                {
-                  title: "Available Languages",
-                  rows: [
-                    { id: "lang_en", title: "English" },
-                    { id: "lang_ur", title: "اردو (Urdu)" },
-                    { id: "lang_hi", title: "हिन्दी (Hindi)" },
-                    { id: "lang_tl", title: "Filipino / Tagalog" }
-                  ]
-                }
-              ]
+      if (interactiveReply === "lang_eng") {
+        lang = "en";
+        step = 1;
+        console.log("✅ English selected, proceeding with script");
+
+      } else if (interactiveReply === "lang_pick") {
+        // Send language list picker
+        try {
+          await client.messages.create({
+            from: FROM_NUMBER,
+            to: from,
+            interactive: {
+              type: "list",
+              body: { text: "🌍 Please select your preferred language to continue:" },
+              action: {
+                button: "Select Language",
+                sections: [
+                  {
+                    title: "Available Languages",
+                    rows: [
+                      { id: "lang_en", title: "English" },
+                      { id: "lang_ur", title: "اردو (Urdu)" },
+                      { id: "lang_hi", title: "हिन्दी (Hindi)" },
+                      { id: "lang_tl", title: "Filipino / Tagalog" }
+                    ]
+                  }
+                ]
+              }
             }
-          }
-        });
-        console.log("✅ Language list sent");
-        await saveSession(from, { step, lang: null, messages });
-      } catch (err) {
-        console.error("❌ Failed sending language list:", err);
+          });
+
+          console.log("✅ Language list sent, waiting for user to select");
+          await saveSession(from, { step, lang: null, messages });
+
+        } catch (err) {
+          console.error("❌ Failed sending language list:", err);
+        }
+
+        return; // pause script until language selected
       }
-      return; // stop here — wait for user to pick
+
+    } else if (interactiveType === "list_reply") {
+      const interactiveReply = interactive.ListReply.Id;
+
+      if (interactiveReply === "lang_en") lang = "en";
+      else if (interactiveReply === "lang_ur") lang = "ur";
+      else if (interactiveReply === "lang_hi") lang = "hi";
+      else if (interactiveReply === "lang_tl") lang = "tl";
+
+      console.log(`✅ Language selected: ${lang}`);
+      step = 1; // start script after language is chosen
+      await saveSession(from, { step, lang, messages });
     }
-
-  } else if (interactiveType === "list_reply") {
-    const interactiveReply = interactive.ListReply.Id;
-
-    if (interactiveReply === "lang_en") lang = "en";
-    else if (interactiveReply === "lang_ur") lang = "ur";
-    else if (interactiveReply === "lang_hi") lang = "hi";
-    else if (interactiveReply === "lang_tl") lang = "tl";
-
-    console.log(`✅ Language selected: ${lang}`);
-    step = 1; // start script after language is chosen
   }
-}
+
+  // --- Pause script if language not selected ---
   if (!lang) {
-    console.log("waiting for language selection...");
+    console.log("⏳ Waiting for user to select language...");
     return;
   }
-  
-  // Reset session
+
+  // --- Reset session ---
   if (body.toLowerCase() === "reset") {
     await saveSession(from, { step: 0, lang: "", messages: [] });
     await sendDelayedMessage({
@@ -263,22 +258,30 @@ if (req.body.Interactive) {
     return;
   }
 
-  //track time and update messages
+  // --- Track messages & timing ---
   messages.push({ role: "user", content: body });
   const now = Date.now();
   const timeSinceLast = now - (messages.lastMessageTime || 0);
   messages.lastMessageTime = now;
 
-       // Save session with step 0 so user can try again
-   const interrupted = await maybeInterruptWithGpt(from, body, { step, lang, messages }, timeSinceLast);
-if (interrupted) return;
-  
-  // Sequential script steps
-const steps = scriptSteps(lang);
-const replyStep = steps[step];
-messages.push({ role: "assistant", content: replyStep.body });
-  
-  // Send media if it exists
+  // --- GPT fallback if needed ---
+  const interrupted = await maybeInterruptWithGpt(from, body, { step, lang, messages }, timeSinceLast);
+  if (interrupted) return;
+
+  // --- Sequential script steps ---
+  const steps = scriptSteps(lang);
+
+  // Check if script is completed
+  if (step >= steps.length) {
+    console.log("🎉 Script completed for this user");
+    await handleGptFallback(from, body, { step, lang, messages }, lang);
+    return;
+  }
+
+  const replyStep = steps[step];
+  messages.push({ role: "assistant", content: replyStep.body });
+
+  // Send media if exists
   if (replyStep.mediaUrl) {
     await sendMediaWithText({
       from: FROM_NUMBER,
@@ -291,11 +294,12 @@ messages.push({ role: "assistant", content: replyStep.body });
       from: FROM_NUMBER,
       to: from,
       body: replyStep.body
-      });
-    }
-  step ++;
-  await saveSession(from, { step, lang, messages });
+    });
+  }
 
+  step++;
+  await saveSession(from, { step, lang, messages });
+});
   //check if script completed and start fallbackGPT
   if (step >= steps.length){
     console.log ("Script completed for this user");
