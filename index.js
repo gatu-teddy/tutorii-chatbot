@@ -181,46 +181,41 @@ app.post("/webhook", async (req, res) => {
   }
 
   // --- Handle quick reply or list selection ---
-  if (req.body.Interactive) {
-    const interactive = req.body.Interactive;
-    const interactiveType = interactive.type; // "button_reply" or "list_reply"
+  const buttonText = req.body.Body?.trim();
+console.log("Button pressed:", buttonText);
 
-    if (interactiveType === "button_reply") {
-      const interactiveReply = interactive.ButtonReply.Id;
-
-      if (interactiveReply === "lang_eng") {
-        lang = "en";
-        step = 1;
-        console.log("✅ English selected, proceeding with script");
-
-      } else if (interactiveReply === "lang_pick") {
-        // Send language list picker
-        try {
-          await client.messages.create({
-            from: FROM_NUMBER,
-            to: from,
-            interactive: {
-              type: "list",
-              body: { text: "🌍 Please select your preferred language to continue:" },
-              action: {
-                button: "Select Language",
-                sections: [
-                  {
-                    title: "Available Languages",
-                    rows: [
-                      { id: "lang_en", title: "English" },
-                      { id: "lang_ur", title: "اردو (Urdu)" },
-                      { id: "lang_hi", title: "हिन्दी (Hindi)" },
-                      { id: "lang_tl", title: "Filipino / Tagalog" }
-                    ]
-                  }
-                ]
-              }
-            }
-          });
-
-          console.log("✅ Language list sent, waiting for user to select");
-          await saveSession(from, { step, lang: null, messages });
+if (buttonText === "Proceed in English") {
+  lang = "en";
+  step = 1; // start the script
+  console.log("✅ English selected, proceeding with script");
+} else if (buttonText === "Select Language") {
+  // Send your list picker here
+  await client.messages.create({
+    from: FROM_NUMBER,
+    to: from,
+    interactive: {
+      type: "list",
+      body: { text: "🌍 Please select your preferred language to continue:" },
+      action: {
+        button: "Select Language",
+        sections: [
+          {
+            title: "Available Languages",
+            rows: [
+              { id: "lang_en", title: "English" },
+              { id: "lang_ur", title: "اردو (Urdu)" },
+              { id: "lang_hi", title: "हिन्दी (Hindi)" },
+              { id: "lang_tl", title: "Filipino / Tagalog" }
+            ]
+          }
+        ]
+      }
+    }
+  });
+  console.log("✅ Language list sent");
+  await saveSession(from, { step, lang: null, messages });
+  return; // pause here
+}
 
         } catch (err) {
           console.error("❌ Failed sending language list:", err);
