@@ -193,6 +193,7 @@ if (buttonText === "Proceed in English") {
   await client.messages.create({
     from: FROM_NUMBER,
     to: from,
+    body: "🌍 Please select your preferred language to continue:",
     interactive: {
       type: "list",
       body: { text: "🌍 Please select your preferred language to continue:" },
