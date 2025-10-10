@@ -300,13 +300,6 @@ app.post("/webhook", async (req, res) => {
   step++;
   await saveSession(from, { step, lang, messages });
 });
-  //check if script completed and start fallbackGPT
-  if (step >= steps.length){
-    console.log ("Script completed for this user");
-    await handleGptFallBack (from, body, session, lang);
-  }
-  return;
-});
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
