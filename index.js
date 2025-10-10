@@ -182,44 +182,54 @@ app.post("/webhook", async (req, res) => {
   }
 
   // --- Handle quick reply or list selection ---
+  const msgType = req.body.MessageType;
   const buttonText = req.body.Body?.trim();
-console.log("Button pressed:", buttonText);
+  const buttonPayload = req.body.ButtonPayload;
+  const listId = req.body.ListId;
+  const from = req.body.From;
+  
+  console.log("Button pressed:", buttonText);
+  console.log("Button pressed or list selected:", buttonText || listId);
 
-if (buttonText === "Proceed in English") {
-  lang = "en";
-  step = 1; // start the script
-  console.log("✅ English selected, proceeding with script");
-} else if (buttonText === "Select Language") {
-  // Send your list picker here
-  try {
-    await sendDelayedMessage({
-      from: FROM_NUMBER,
-      to: from,
-      contentSid: LIST_TEMPLATE_SID
-    });
-    console.log("✅ List template sent, waiting for user to select language");
-    await saveSession(from, { step, lang: null, messages });
-  } catch (err) {
-    console.error("❌ Failed sending list template:", err);
+  // --- Handle Quick Reply Buttons ---
+if (msgType === "button") {
+  if (buttonPayload === "lang_eng") {
+    lang = "en";
+    step = 1;
+    console.log("✅ English selected, proceeding with script");
+  } else if (buttonPayload === "lang_pick") {
+    // Send your list picker template
+    try {
+      await sendDelayedMessage({
+        from: FROM_NUMBER,
+        to: from,
+        contentSid: LIST_TEMPLATE_SID
+      });
+      console.log("✅ List template sent, waiting for user to select language");
+      await saveSession(from, { step, lang: null, messages });
+    } catch (err) {
+      console.error("❌ Failed sending list template:", err);
+    }
+    return; // pause here until user selects language
   }
-  return; // pause here until user selects language
 }
 
-  // Handle list template reply
-if (req.body.Interactive?.type?.toLowerCase() === "list_reply") {
-  const listId = req.body.Interactive.list_reply?.id;
-
+// --- Handle List Template Replies ---
+if (msgType === "interactive" && listId) {
   if (listId === "lang_eng") lang = "en";
-  else if (listId === "lang_ard") lang = "ur";
-  else if (listId === "lang_hin") lang = "hi";
-  else if (listId === "lang_tag") lang = "tl";
+  else if (listId === "lang_ur") lang = "ur";
+  else if (listId === "lang_hi") lang = "hi";
+  else if (listId === "lang_tl") lang = "tl";
 
   if (lang) {
     step = 1; // continue script after language selected
     console.log(`✅ Language selected from list: ${lang}`);
     await saveSession(from, { step, lang, messages });
+  } else {
+    console.warn("⚠️ Unknown list selection:", listId);
   }
 }
+  
   // --- Pause script if language not selected ---
   if (!lang) {
     console.log("⏳ Waiting for user to select language...");
