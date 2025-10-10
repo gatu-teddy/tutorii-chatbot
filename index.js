@@ -181,7 +181,7 @@ app.post("/webhook", async (req, res) => {
   // --- Handle quick reply or list selection ---
   if (req.body.Interactive) {
     const interactive = req.body.Interactive;
-    const interactiveType = interactive.Type; // "button_reply" or "list_reply"
+    const interactiveType = interactive.type; // "button_reply" or "list_reply"
 
     if (interactiveType === "button_reply") {
       const interactiveReply = interactive.ButtonReply.Id;
