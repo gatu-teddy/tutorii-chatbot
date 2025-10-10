@@ -205,6 +205,21 @@ if (buttonText === "Proceed in English") {
   return; // pause here until user selects language
 }
 
+  // Handle list template reply
+if (req.body.Interactive?.type?.toLowerCase() === "list_reply") {
+  const listId = req.body.Interactive.list_reply?.id;
+
+  if (listId === "lang_eng") lang = "en";
+  else if (listId === "lang_ard") lang = "ur";
+  else if (listId === "lang_hin") lang = "hi";
+  else if (listId === "lang_tag") lang = "tl";
+
+  if (lang) {
+    step = 1; // continue script after language selected
+    console.log(`✅ Language selected from list: ${lang}`);
+    await saveSession(from, { step, lang, messages });
+  }
+}
   // --- Pause script if language not selected ---
   if (!lang) {
     console.log("⏳ Waiting for user to select language...");
