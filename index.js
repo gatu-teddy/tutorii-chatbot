@@ -186,7 +186,6 @@ app.post("/webhook", async (req, res) => {
   const buttonText = req.body.Body?.trim();
   const buttonPayload = req.body.ButtonPayload;
   const listId = req.body.ListId;
-  const from = req.body.From;
   
   console.log("Button pressed:", buttonText);
   console.log("Button pressed or list selected:", buttonText || listId);
