@@ -152,6 +152,8 @@ const {step, lang,messages} = session;
 }
 
 app.post("/webhook", async (req, res) => {
+  console.log("incoming twilio webhook:");
+  console.log(JSON.stringify(req.body, null, 2));
   const from = req.body.From?.trim();
   const body = (req.body.Body || "").trim();
 
