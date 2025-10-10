@@ -12,7 +12,7 @@ const ADMIN_NUMBER = "whatsapp:+971567728465";
 const TARGET_NUMBER = "whatsapp:+971567728465";
 const TRIGGER_KEYWORD = "trigger max";
 const CONTENT_SID = "HX10d4b7df2f013a450a7aba22ead93f25";
-const LIST_TEMPLATE_SID = "HXaf07c7d57e01430acc4d264c941a130c";
+const LIST_TEMPLATE_SID = "HX4b84ace2718a2112c2e6f8bda6adfa31";
 const FROM_NUMBER = "whatsapp:+971504095079";
 
 const videoLinks = {
