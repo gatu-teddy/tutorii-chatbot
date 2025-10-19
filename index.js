@@ -14,9 +14,10 @@ app.use(express.json());
 const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 
 const ADMIN_NUMBER = "whatsapp:+971567728465";
-const TARGET_NUMBER = "whatsapp:+971589097795";
+//const TARGET_NUMBER = "whatsapp:+971589097795";
 const TRIGGER_KEYWORD = "trigger max";
-const CONTENT_SID = "HX034d351d1041ce22cd971eb3be6efad3";
+const CONTENT_SID = "HX10d4b7df2f013a450a7aba22ead93f25";
+const LIST_TEMPLATE_SID = "HX4b84ace2718a2112c2e6f8bda6adfa31";
 const FROM_NUMBER = "whatsapp:+971504095079";
 
 const videoLinks = {
@@ -164,6 +165,7 @@ app.post("/webhook", async (req, res) => {
 
   console.log(`📨 From: ${from}`);
   console.log(`💬 Body: ${body}`);
+  console.log(JSON.stringify(req.body, null, 2));
 
   // Respond immediately to avoid Twilio timeout
   res.type("text/xml").send("<Response></Response>");
@@ -245,7 +247,61 @@ app.post("/webhook", async (req, res) => {
     return; //exit for admin trigger
   }
 
-  // Reset session
+      // --- Handle quick reply or list selection ---
+  const msgType = req.body.MessageType;
+  const buttonText = req.body.Body?.trim();
+  const buttonPayload = req.body.ButtonPayload;
+  const listId = req.body.ListId;
+  
+  console.log("Button pressed:", buttonText);
+  console.log("Button pressed or list selected:", buttonText || listId);
+
+  // --- Handle Quick Reply Buttons ---
+if (msgType === "button") {
+  if (buttonPayload === "lang_eng") {
+    lang = "en";
+    step = 1;
+    console.log("✅ English selected, proceeding with script");
+  } else if (buttonPayload === "lang_pick") {
+    // Send your list picker template
+    try {
+      await sendDelayedMessage({
+        from: FROM_NUMBER,
+        to: from,
+        contentSid: LIST_TEMPLATE_SID
+      });
+      console.log("✅ List template sent, waiting for user to select language");
+      await saveSession(from, { step, lang: null, messages });
+    } catch (err) {
+      console.error("❌ Failed sending list template:", err);
+    }
+    return; // pause here until user selects language
+  }
+}
+
+// --- Handle List Template Replies ---
+if (msgType === "interactive" && listId) {
+  if (listId === "lang_eng") lang = "en";
+  else if (listId === "lang_urd") lang = "ur";
+  else if (listId === "lang_hin") lang = "hi";
+  else if (listId === "lang_tag") lang = "tl";
+
+  if (lang) {
+    step = 1; // continue script after language selected
+    console.log(`✅ Language selected from list: ${lang}`);
+    await saveSession(from, { step, lang, messages });
+  } else {
+    console.warn("⚠️ Unknown list selection:", listId);
+  }
+}
+  
+  // --- Pause script if language not selected ---
+  if (!lang) {
+    console.log("⏳ Waiting for user to select language...");
+    return;
+  }
+
+  // --- Reset session ---
   if (body.toLowerCase() === "reset") {
     await saveSession(from, { step: 0, lang: "", messages: [] });
     await sendDelayedMessage({
@@ -256,43 +312,30 @@ app.post("/webhook", async (req, res) => {
     return;
   }
 
+  // --- Track messages & timing ---
   messages.push({ role: "user", content: body });
   const now = Date.now();
   const timeSinceLast = now - (messages.lastMessageTime || 0);
   messages.lastMessageTime = now;
-  
- // detect language
-  if (step === 0) {
-    const lower = body.toLowerCase();
-    if (lower.includes("english") || lower.includes("eng") || lower.includes("engl")) lang = "en";
-    else if (lower.includes("urdu") || lower.includes("اردو")) lang = "ur";
-    else if (lower.includes("hindi") || lower.includes("हिन्दी")) lang = "hi";
-    else if (lower.includes("filipino") || lower.includes("pilipino") || lower.includes("tagalog")) lang = "tl";
-    else lang = null; //not yet recognised
-    
-  
 
-  // Language selection if not recognised
-  if (!lang) {
-      await sendDelayedMessage({
-        from: FROM_NUMBER,
-        to: from,
-        body: "❌ Sorry, that's not a supported language. Please reply with English, Pilipino, اردو, or हिन्दी."
-      });
-       // Save session with step 0 so user can try again
-    await saveSession(from, { step: 0, lang: null, messages });
-    return; // exit here, wait for next reply
-    }
+  // --- GPT fallback if needed ---
+  const interrupted = await maybeInterruptWithGpt(from, body, { step, lang, messages }, timeSinceLast);
+  if (interrupted) return;
+
+  // --- Sequential script steps ---
+  const steps = scriptSteps(lang);
+
+  // Check if script is completed
+  if (step >= steps.length) {
+    console.log("🎉 Script completed for this user");
+    await handleGptFallback(from, body, { step, lang, messages });
+    return;
   }
 
-  const interrupted = await maybeInterruptWithGpt(from, body, { step, lang, messages }, timeSinceLast);
-if (interrupted) return;
-  // Sequential script steps
-step++;
-const steps = scriptSteps(lang);
-const replyStep = steps[step];
-messages.push({ role: "assistant", content: replyStep.body });
-  // Send media if it exists
+  const replyStep = steps[step];
+  messages.push({ role: "assistant", content: replyStep.body });
+
+  // Send media if exists
   if (replyStep.mediaUrl) {
     await sendMediaWithText({
       from: FROM_NUMBER,
@@ -304,12 +347,12 @@ messages.push({ role: "assistant", content: replyStep.body });
     await sendDelayedMessage({
       from: FROM_NUMBER,
       to: from,
-      body: replyStep.body});
-}
+      body: replyStep.body
+    });
+  }
 
+  step++;
   await saveSession(from, { step, lang, messages });
-  return;
-
 });
 
 const PORT = process.env.PORT || 3000;
