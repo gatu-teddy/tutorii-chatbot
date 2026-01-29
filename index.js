@@ -44,7 +44,7 @@ function loadPrompt(filename) {
   return fs.readFileSync(path.join(PROMPTS_DIR, filename), "utf8")
 }
 
-const CORE_RULES = loadPrompt("core_rules.txt")
+const CORE_RULES = loadPrompt("CoreRules.txt")
 const STAGE_PLAYBOOK = loadPrompt("StagePlaybook.txt")
 const EARNINGS_LOGIC = loadPrompt("EarningsLogic.txt")
 //const EARNING_EXAMPLES = loadPrompt("earning_examples.txt")
