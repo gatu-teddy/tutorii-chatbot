@@ -9,9 +9,9 @@ import {OpenRouter} from "@openrouter/sdk"
 // --------------------
 // ENV VARIABLES
 // --------------------
-const { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, OPENAI_KEY } = process.env
+const { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, GPT_API_KEY } = process.env
 
-if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !OPENAI_KEY) {
+if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !GPT_API_KEY) {
   console.error("Missing environment variables.")
   process.exit(1)
 }
