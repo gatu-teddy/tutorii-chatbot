@@ -39,7 +39,7 @@ const TARGET_NUMBER = "+254796143065" // Recipient of template & GPT reply
 // --------------------
 // Load prompts
 // --------------------
-const PROMPTS_DIR = path.join(process.cwd(), "prompts")
+const PROMPTS_DIR = path.join(process.cwd(), "Prompts")
 function loadPrompt(filename) {
   return fs.readFileSync(path.join(PROMPTS_DIR, filename), "utf8")
 }
