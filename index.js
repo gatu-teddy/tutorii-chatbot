@@ -74,8 +74,8 @@ async function sendWhatsAppMessage(toNumber, text) {
 // GPT reply function
 // --------------------
 async function generateGPTReply(userMessage) {
-  const completion = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
+  const completion = await openrouter.chat.send({
+    model: "mistralai/devstral-2512",
     messages: [
       { role: "system", content: CORE_RULES },
       { role: "system", content: STAGE_PLAYBOOK },
