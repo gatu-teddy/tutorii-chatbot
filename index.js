@@ -99,34 +99,32 @@ app.post("/webhook", async (req, res) => {
   const from = req.body.From.replace("whatsapp:", "")
   const body = req.body.Body.trim()
 
-  console.log("Received message from:", from)
-  console.log("Message body:", body)
+  console.log("Received message from:", from, "body:", body)
 
-  // Only respond if from ADMIN and matches trigger
-  if (from === ADMIN_NUMBER && body.toLowerCase() === ADMIN_TRIGGER.toLowerCase()) {
-    try {
-      // Step 1: Send approved template to target number
+  try {
+    // --- Admin trigger ---
+    if (from === ADMIN_NUMBER && body.toLowerCase() === ADMIN_TRIGGER.toLowerCase()) {
       const templateMsg = await sendTemplate(TARGET_NUMBER)
-      console.log("Template sent:", templateMsg.sid)
-
-      // Step 2: Generate GPT reply based on trigger
-      const gptReply = await generateGPTReply(body)
-
-      // Step 3: Send GPT reply to target number
-      const gptMsg = await sendWhatsAppMessage(TARGET_NUMBER, gptReply)
-      console.log("GPT reply sent:", gptMsg.sid)
-
-      res.sendStatus(200)
-    } catch (err) {
-      console.error("Error sending messages:", err)
-      res.sendStatus(500)
+      console.log("Template sent to target:", templateMsg.sid)
+      return res.sendStatus(200)
     }
-  } else {
-    console.log("Message ignored (not admin trigger)")
-    res.sendStatus(200)
+
+    // --- User replies ---
+    if (from === TARGET_NUMBER) {
+      const gptReply = await generateGPTReply(body)
+      const gptMsg = await sendWhatsAppMessage(TARGET_NUMBER, gptReply)
+      console.log("GPT reply sent to user:", gptMsg.sid)
+      return res.sendStatus(200)
+    }
+
+    // Ignore other numbers
+    console.log("Message ignored")
+    return res.sendStatus(200)
+  } catch (err) {
+    console.error("Error handling message:", err)
+    return res.sendStatus(500)
   }
 })
-
 // --------------------
 // Start server
 // --------------------
