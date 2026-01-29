@@ -3,15 +3,15 @@ import path from "path"
 import express from "express"
 import bodyParser from "body-parser"
 import twilio from "twilio"
-//import OpenAI from "openai"
-import {OpenRouter} from "@openrouter/sdk"
+import OpenAI from "openai"
+//import {OpenRouter} from "@openrouter/sdk"
 
 // --------------------
 // ENV VARIABLES
 // --------------------
-const { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, GPT_API_KEY } = process.env
+const { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, OPENAI_KEY } = process.env
 
-if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !GPT_API_KEY) {
+if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !OPENAI_KEY) {
   console.error("Missing environment variables.")
   process.exit(1)
 }
@@ -24,7 +24,8 @@ const twilioClient = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
 // --------------------
 // OpenAI client
 // --------------------
-const openrouter = new OpenRouter({ apiKey: GPT_API_KEY })
+//const openrouter = new OpenRouter({ apiKey: GPT_API_KEY })
+const openai = new OpenAI({ apiKey: OPENAI_KEY })
 
 // --------------------
 // Admin configuration
@@ -81,9 +82,9 @@ async function sendWhatsAppMessage(toNumber, text) {
 // GPT reply function
 // --------------------
 async function generateGPTReply(userMessage) {
-  const completion = await openrouter.chat.completions.create({
-    //model: "mistralai/devstral-2512",
-    model: "mistralai/mistral-7b-instruct",
+  const completion = await openai.chat.completions.create({
+    model: "gpt-4o-mini",
+    //model: "mistralai/mistral-7b-instruct",
     max_tokens: 400,
     temperature: 0.6,
     messages: [
