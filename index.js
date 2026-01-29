@@ -1,293 +1,134 @@
-import express from "express";
-import twilio from "twilio";
-import axios from "axios";
+import fs from "fs"
+import path from "path"
+import express from "express"
+import bodyParser from "body-parser"
+import twilio from "twilio"
+import OpenAI from "openai"
 
-const app = express();
-app.use(express.urlencoded({ extended: false }));
-app.use(express.json());
+// --------------------
+// ENV VARIABLES
+// --------------------
+const { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, OPENAI_API_KEY } = process.env
 
-const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-
-const ADMIN_NUMBER = "whatsapp:+971567728465";
-const TARGET_NUMBER = "whatsapp:+254796143065";
-const TRIGGER_KEYWORD = "trigger max";
-const CONTENT_SID = "HX10d4b7df2f013a450a7aba22ead93f25";
-const LIST_TEMPLATE_SID = "HX4b84ace2718a2112c2e6f8bda6adfa31";
-const FROM_NUMBER = "whatsapp:+971504095079";
-
-const videoLinks = {
-  en: "https://mytutoriitestbucket.s3.eu-north-1.amazonaws.com/Tutorii+English-1080p-250621.mp4",
-  ur: "https://mytutoriitestbucket.s3.eu-north-1.amazonaws.com/Tutorii+Urdu-1080P-250621(1).mp4",
-  hi: "https://mytutoriitestbucket.s3.eu-north-1.amazonaws.com/Tutorii+Hindi-1080P-250621.mp4",
-  tl: "https://mytutoriitestbucket.s3.eu-north-1.amazonaws.com/Tutorii+Tagalog-1080P-250621.mp4"
-};
-
-const scriptSteps = (lang) => [
-  {
-    body: "Hi there, how are you? I recently came across your CV online. My name is David and I’m contacting you on behalf of tutorii.com. We think you might be a great fit for an opportunity we’re currently offering. We are currently looking for salespeople to help the growth of our platform. Might this be something of interest to you?"
-  },
-  {
-    body: "So, Tutorii.com is a subscription-based educational platform designed to empower individuals with practical knowledge about life in the UAE and the wider GCC region — from protecting yourself and understanding local systems, to finding jobs and building your career. But that’s not all — as a subscriber, you also unlock the chance to earn a strong, recurring income by simply referring others. It’s a great opportunity to start your own business, take control of your future, and grow financially — all while learning skills that genuinely improve your life",
-    mediaUrl: [videoLinks[lang] || videoLinks.en]
-  },
-  {
-    body: "Right now, we’re looking to bring on new Sales Managers who want to grow with the platform, invite others to join, and build a solid foundation in business, leadership, and online income. Feel free to ask any question about the platform. Click on Tutorii.com to join the team."
-  }
-];
-
-// Helper delay function
-const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
-
-// Helper to send Twilio message with 1 minute delay
-async function sendDelayedMessage(params) {
-  console.log(`⏳ Waiting 1 minute before sending message to ${params.to}`);
-  await delay(10000);
-  console.log(`✉️ Sending message to ${params.to}`);
-  return client.messages.create(params);
+if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !OPENAI_API_KEY) {
+  console.error("Missing environment variables.")
+  process.exit(1)
 }
 
-//helper to send delayed message with video attached
-async function sendMediaWithText({ from, to, body, mediaUrl }) {
-  // delay once for the whole pair
-console.log(`Waiting 1 minute before sending message to ${to}`);
-  await delay(10000);
+// --------------------
+// Twilio client
+// --------------------
+const twilioClient = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
 
-  // send video
-console.log(`sending video without delay to &{to}`);
-  await client.messages.create({ from, to, mediaUrl });
+// --------------------
+// OpenAI client
+// --------------------
+const openai = new OpenAI({ apiKey: OPENAI_API_KEY })
 
-  // send caption text right after
-console.log(`sending text without delay to &{to}`);
-  if (body) {
-    await client.messages.create({ from, to, body });
-  }
+// --------------------
+// Admin configuration
+// --------------------
+const ADMIN_NUMBER = "+971567728465" // Replace with your WhatsApp number
+const ADMIN_TRIGGER = "Trigger max"     // Replace with your specific admin trigger message
+
+// --------------------
+// Target number to send messages to
+// --------------------
+const TARGET_NUMBER = "+254796143065" // Recipient of template & GPT reply
+
+// --------------------
+// Load prompts
+// --------------------
+const PROMPTS_DIR = path.join(process.cwd(), "prompts")
+function loadPrompt(filename) {
+  return fs.readFileSync(path.join(PROMPTS_DIR, filename), "utf8")
 }
 
-async function getSession(id) {
-  try {
-    const doc = await client.sync.v1.services(process.env.SYNC_SERVICE_SID)
-      .documents(id)
-      .fetch();
-    return doc.data;
-  } catch (e) {
-    if (e.status === 404) return { step: 0, lang: "", messages: [] };
-    throw e;
-  }
+const CORE_RULES = loadPrompt("core_rules.txt")
+const STAGE_PLAYBOOK = loadPrompt("StagePlaybook.txt")
+const EARNINGS_LOGIC = loadPrompt("EarningsLogic.txt")
+//const EARNING_EXAMPLES = loadPrompt("earning_examples.txt")
+//const OBJECTIONS = loadPrompt("objections.txt")
+
+// --------------------
+// Twilio send functions
+// --------------------
+async function sendTemplate(toNumber) {
+  return twilioClient.messages.create({
+    from: "whatsapp:+971504095079",  // Replace with your Twilio WhatsApp number
+    to: `whatsapp:${toNumber}`,
+    contentSid: "HXf5f95d60ca9dc0f4ce743de60376fbb2", // Replace with your approved template SID
+    contentVariables: JSON.stringify({ 1: "there" }) // Template variables
+  })
 }
 
-async function saveSession(id, data) {
-  try {
-    await client.sync.v1.services(process.env.SYNC_SERVICE_SID)
-      .documents(id)
-      .update({ data });
-  } catch (e) {
-    if (e.status === 404) {
-      await client.sync.v1.services(process.env.SYNC_SERVICE_SID)
-        .documents.create({ uniqueName: id, data });
-    } else {
-      throw e;
-    }
-  }
+async function sendWhatsAppMessage(toNumber, text) {
+  return twilioClient.messages.create({
+    from: "whatsapp:+971504095079",  // Your Twilio WhatsApp number
+    to: `whatsapp:${toNumber}`,
+    body: text
+  })
 }
 
-function shouldInterruptForGpt(message) {
-  const lower = message.toLowerCase();
-  const gptKeywords = ["how", "what", "where", "when", "can i", "join", "subscribe", "details","tell me", "info", "price", "cost", "earn", "money", "trial"
-    ];
-  return gptKeywords.some(keyword => lower.includes(keyword)) || lower.endsWith("?");
+// --------------------
+// GPT reply function
+// --------------------
+async function generateGPTReply(userMessage) {
+  const completion = await openai.chat.completions.create({
+    model: "gpt-4o-mini",
+    messages: [
+      { role: "system", content: CORE_RULES },
+      { role: "system", content: STAGE_PLAYBOOK },
+      { role: "system", content: EARNINGS_LOGIC },
+      { role: "system", content: EARNING_EXAMPLES },
+      { role: "system", content: OBJECTIONS },
+      { role: "user", content: userMessage }
+    ]
+  })
+
+  return completion.choices[0].message.content
 }
 
-async function maybeInterruptWithGpt(from, body, session, timeSinceLast) {
-const {step, lang,messages} = session;
-  // Ignore tiny corrections if very quick (typo fixes)
-  if (body.length <= 4 && timeSinceLast < 5000) {
-    console.log("✏️ Short correction detected — continuing steps.");
-    return false;
-  }
-
-  if (shouldInterruptForGpt(body)) {
-    console.log("⚡ Interrupt detected — falling back to GPT.");
-    await handleGptFallback(from, body, session, lang);
-    return true; // stop script
-  }
-  return false; // continue steps
-}
-
-  // After script → GPT fallback
-  async function handleGptFallback(from, body, session, lang) {
-  try {
-    const gptRes = await axios.post(
-      "https://openrouter.ai/api/v1/chat/completions",
-      {
-        model: "mistralai/mistral-small-3.2-24b-instruct",
-        messages: [
-          {
-            role: "system",
-            content: `You are David, a friendly recruiter for Tutorii.com. Stay on topic about Tutorii’s educational and referral website platform. Do not answer questions unrelated to Tutorii. Only list benefits from this information. Once the user shows interest , diect them to Tutorii.com so they can register or subscribe. Keep responses short, helpful, and persuasive. Never answer unrelated questions. COST & VALUE: If someone says they can’t afford it, say it’s very affordable and most people earn back the fee by referring a few others. If they mention free content, explain Tutorii is structured, focused on UAE/GCC, and includes income potential. If they ask if it’s worth it, confirm it’s a small investment with big learning and earning value. No monthly commitment—you can cancel anytime. No free trial—value unlocks with subscription. TRUST & LEGITIMACY: Tutorii is UAE-registered and licensed. Not a pyramid scheme—simple direct commissions. Transparent, with real education and support. HOW IT WORKS: Subscribe, learn, and optionally earn by referrals. Topics include life in UAE, worker rights, job hunting, money tips. Different from YouTube—structured, focused, plus income. No selling or teaching required. TIME & COMMITMENT: Flexible, even 15 minutes per day helps. The sooner you start, the sooner you earn. EARNING & REFERRALS: Earnings depend on effort; 5 referrals can bring $100/month. Only earn while referrals stay subscribed. Weekly payouts via Stripe; we guide setup. Commissions are 40% direct plus 5% second-level. ACCESS & LANGUAGE: Works globally, not just UAE. Content in English, Urdu, Tagalog, Hindi. Mobile-friendly, no laptop needed. LEGAL & ETHICAL: Fully allowed, doesn’t affect visas or jobs. Halal and ethical—just knowledge sharing. SKEPTICAL REPLIES: If they say they’re thinking about it, say starting now means earning sooner. If they want details later, send the link and stay available. PRICING: $19.85 US dollars/month, cancel anytime. Includes full learning access and referral tools. Always stay polite, positive, and focused on Tutorii. Respond in ${lang || "English"}`
-          },
-          ...session.messages,
-          { role: "user", content: body }
-        ]
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${process.env.GPT_API_KEY}`,
-          "Content-Type": "application/json"
-        }
-      }
-    );
-
-    const gptReply = gptRes.data.choices?.[0]?.message?.content || "⚠️ No response from AI.";
-    session.messages.push({ role: "assistant", content: gptReply });
-    await saveSession(from, session);
-
-    await sendDelayedMessage({ from: FROM_NUMBER, to: from, body: gptReply });
-  } catch (err) {
-    console.error("❌ GPT API error:", err.response?.data || err.message);
-    await sendDelayedMessage({
-      from: FROM_NUMBER,
-      to: from,
-      body: "🛑 Error talking to the AI. Try again later."
-    });
-  }
-}
+// --------------------
+// Express webhook server
+// --------------------
+const app = express()
+app.use(bodyParser.urlencoded({ extended: false }))
 
 app.post("/webhook", async (req, res) => {
-  console.log("incoming twilio webhook:");
-  console.log(JSON.stringify(req.body, null, 2));
-  const from = req.body.From?.trim();
-  const body = (req.body.Body || "").trim();
+  const from = req.body.From.replace("whatsapp:", "")
+  const body = req.body.Body.trim()
 
-  // Respond immediately to avoid Twilio timeout
-  res.type("text/xml").send("<Response></Response>");
+  console.log("Received message from:", from)
+  console.log("Message body:", body)
 
-  // Load session
-  let { step, lang, messages } = await getSession(from);
-
-  // --- Admin trigger: send template message ---
-  if (from === ADMIN_NUMBER && body.toLowerCase().includes(TRIGGER_KEYWORD)) {
-    console.log("🚀 Admin trigger detected — sending template message with delay");
+  // Only respond if from ADMIN and matches trigger
+  if (from === ADMIN_NUMBER && body.toLowerCase() === ADMIN_TRIGGER.toLowerCase()) {
     try {
-      await sendDelayedMessage({
-        from: FROM_NUMBER,
-        to: TARGET_NUMBER,
-        contentSid: CONTENT_SID
-      });
-      console.log("✅ Template message sent");
-      await saveSession(TARGET_NUMBER, { step: 0, lang: "", messages: [] });
+      // Step 1: Send approved template to target number
+      const templateMsg = await sendTemplate(TARGET_NUMBER)
+      console.log("Template sent:", templateMsg.sid)
+
+      // Step 2: Generate GPT reply based on trigger
+      const gptReply = await generateGPTReply(body)
+
+      // Step 3: Send GPT reply to target number
+      const gptMsg = await sendWhatsAppMessage(TARGET_NUMBER, gptReply)
+      console.log("GPT reply sent:", gptMsg.sid)
+
+      res.sendStatus(200)
     } catch (err) {
-      console.error("❌ Error sending template message:", err);
+      console.error("Error sending messages:", err)
+      res.sendStatus(500)
     }
-    return;
-  }
-
-  // --- Handle quick reply or list selection ---
-  const msgType = req.body.MessageType;
-  const buttonText = req.body.Body?.trim();
-  const buttonPayload = req.body.ButtonPayload;
-  const listId = req.body.ListId;
-  
-  console.log("Button pressed:", buttonText);
-  console.log("Button pressed or list selected:", buttonText || listId);
-
-  // --- Handle Quick Reply Buttons ---
-if (msgType === "button") {
-  if (buttonPayload === "lang_eng") {
-    lang = "en";
-    step = 1;
-    console.log("✅ English selected, proceeding with script");
-  } else if (buttonPayload === "lang_pick") {
-    // Send your list picker template
-    try {
-      await sendDelayedMessage({
-        from: FROM_NUMBER,
-        to: from,
-        contentSid: LIST_TEMPLATE_SID
-      });
-      console.log("✅ List template sent, waiting for user to select language");
-      await saveSession(from, { step, lang: null, messages });
-    } catch (err) {
-      console.error("❌ Failed sending list template:", err);
-    }
-    return; // pause here until user selects language
-  }
-}
-
-// --- Handle List Template Replies ---
-if (msgType === "interactive" && listId) {
-  if (listId === "lang_eng") lang = "en";
-  else if (listId === "lang_urd") lang = "ur";
-  else if (listId === "lang_hin") lang = "hi";
-  else if (listId === "lang_tag") lang = "tl";
-
-  if (lang) {
-    step = 1; // continue script after language selected
-    console.log(`✅ Language selected from list: ${lang}`);
-    await saveSession(from, { step, lang, messages });
   } else {
-    console.warn("⚠️ Unknown list selection:", listId);
+    console.log("Message ignored (not admin trigger)")
+    res.sendStatus(200)
   }
-}
-  
-  // --- Pause script if language not selected ---
-  if (!lang) {
-    console.log("⏳ Waiting for user to select language...");
-    return;
-  }
+})
 
-  // --- Reset session ---
-  if (body.toLowerCase() === "reset") {
-    await saveSession(from, { step: 0, lang: "", messages: [] });
-    await sendDelayedMessage({
-      from: FROM_NUMBER,
-      to: from,
-      body: "✅ Session reset. Say something to start again."
-    });
-    return;
-  }
-
-  // --- Track messages & timing ---
-  messages.push({ role: "user", content: body });
-  const now = Date.now();
-  const timeSinceLast = now - (messages.lastMessageTime || 0);
-  messages.lastMessageTime = now;
-
-  // --- GPT fallback if needed ---
-  const interrupted = await maybeInterruptWithGpt(from, body, { step, lang, messages }, timeSinceLast);
-  if (interrupted) return;
-
-  // --- Sequential script steps ---
-  const steps = scriptSteps(lang);
-
-  // Check if script is completed
-  if (step >= steps.length) {
-    console.log("🎉 Script completed for this user");
-    await handleGptFallback(from, body, { step, lang, messages }, lang);
-    return;
-  }
-
-  const replyStep = steps[step];
-  messages.push({ role: "assistant", content: replyStep.body });
-
-  // Send media if exists
-  if (replyStep.mediaUrl) {
-    await sendMediaWithText({
-      from: FROM_NUMBER,
-      to: from,
-      body: replyStep.body,
-      mediaUrl: replyStep.mediaUrl
-    });
-  } else {
-    await sendDelayedMessage({
-      from: FROM_NUMBER,
-      to: from,
-      body: replyStep.body
-    });
-  }
-
-  step++;
-  await saveSession(from, { step, lang, messages });
-});
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+// --------------------
+// Start server
+// --------------------
+const PORT = process.env.PORT || 3000
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`))
