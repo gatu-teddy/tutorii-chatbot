@@ -8,9 +8,9 @@ import OpenAI from "openai"
 // --------------------
 // ENV VARIABLES
 // --------------------
-const { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, OPENAI_API_KEY } = process.env
+const { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, OPENAI_KEY } = process.env
 
-if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !OPENAI_API_KEY) {
+if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !OPENAI_KEY) {
   console.error("Missing environment variables.")
   process.exit(1)
 }
@@ -23,7 +23,7 @@ const twilioClient = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
 // --------------------
 // OpenAI client
 // --------------------
-const openai = new OpenAI({ apiKey: OPENAI_API_KEY })
+const openai = new OpenAI({ apiKey: OPENAI_KEY })
 
 // --------------------
 // Admin configuration
