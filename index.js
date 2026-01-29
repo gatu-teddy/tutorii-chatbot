@@ -80,8 +80,8 @@ async function generateGPTReply(userMessage) {
       { role: "system", content: CORE_RULES },
       { role: "system", content: STAGE_PLAYBOOK },
       { role: "system", content: EARNINGS_LOGIC },
-      { role: "system", content: EARNING_EXAMPLES },
-      { role: "system", content: OBJECTIONS },
+      //{ role: "system", content: EARNING_EXAMPLES },
+      //{ role: "system", content: OBJECTIONS },
       { role: "user", content: userMessage }
     ]
   })
