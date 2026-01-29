@@ -48,6 +48,12 @@ function loadPrompt(filename) {
 const CORE_RULES = loadPrompt("CoreRules.txt")
 const STAGE_PLAYBOOK = loadPrompt("StagePlaybook.txt")
 const EARNINGS_LOGIC = loadPrompt("EarningsLogic.txt")
+
+const SYSTEM_PROMPT = [
+  CORE_RULES,
+  STAGE_PLAYBOOK,
+  EARNINGS_LOGIC
+].join("\n\n")
 //const EARNING_EXAMPLES = loadPrompt("earning_examples.txt")
 //const OBJECTIONS = loadPrompt("objections.txt")
 
@@ -75,14 +81,15 @@ async function sendWhatsAppMessage(toNumber, text) {
 // GPT reply function
 // --------------------
 async function generateGPTReply(userMessage) {
-  const completion = await openrouter.chat.send({
-    model: "mistralai/devstral-2512",
+  const completion = await openrouter.chat.completions.create({
+    //model: "mistralai/devstral-2512",
+    model: "mistralai/mistral-7b-instruct",
     max_tokens: 400,
     temperature: 0.6,
     messages: [
-      { role: "system", content: CORE_RULES },
-      { role: "system", content: STAGE_PLAYBOOK },
-      { role: "system", content: EARNINGS_LOGIC },
+      { role: "system", content: SYSTEM_PROMPT },
+      //{ role: "system", content: STAGE_PLAYBOOK },
+      //{ role: "system", content: EARNINGS_LOGIC },
       //{ role: "system", content: EARNING_EXAMPLES },
       //{ role: "system", content: OBJECTIONS },
       { role: "user", content: userMessage }
