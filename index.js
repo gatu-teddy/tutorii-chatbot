@@ -3,7 +3,8 @@ import path from "path"
 import express from "express"
 import bodyParser from "body-parser"
 import twilio from "twilio"
-import OpenAI from "openai"
+//import OpenAI from "openai"
+import openrouter from "@openrouter/sdk
 
 // --------------------
 // ENV VARIABLES
