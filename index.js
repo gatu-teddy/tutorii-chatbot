@@ -77,6 +77,8 @@ async function sendWhatsAppMessage(toNumber, text) {
 async function generateGPTReply(userMessage) {
   const completion = await openrouter.chat.send({
     model: "mistralai/devstral-2512",
+    max_tokens: 400,
+    temperature: 0.6,
     messages: [
       { role: "system", content: CORE_RULES },
       { role: "system", content: STAGE_PLAYBOOK },
