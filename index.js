@@ -24,7 +24,7 @@ const twilioClient = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
 // --------------------
 // OpenAI client
 // --------------------
-const openai = new OpenAI({ apiKey: GPT_API_KEY })
+const openrouter = new OpenRouter({ apiKey: GPT_API_KEY })
 
 // --------------------
 // Admin configuration
