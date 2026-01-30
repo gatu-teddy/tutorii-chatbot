@@ -107,7 +107,7 @@ async function generateGPTReply(userMessage) {
   },
   {
       headers: {
-        "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        "Authorization": `Bearer ${GPT_API_KEY}`,
         "Content-Type": "application/json",
         "HTTP-Referer": "https://tutorii.com", // required by OpenRouter
         "X-Title": "Tutorii WhatsApp Bot"
