@@ -4,14 +4,19 @@ import express from "express"
 import bodyParser from "body-parser"
 import twilio from "twilio"
 import OpenAI from "openai"
+import axios from "axios"
 //import {OpenRouter} from "@openrouter/sdk"
 
 // --------------------
 // ENV VARIABLES
 // --------------------
-const { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, OPENAI_KEY } = process.env
+const { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, 
+       //OPENAI_KEY
+       GPT_API_KEY} = process.env
 
-if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !OPENAI_KEY) {
+if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || 
+    //!OPENAI_KEY
+    !GPT_API_KEY) {
   console.error("Missing environment variables.")
   process.exit(1)
 }
@@ -25,7 +30,9 @@ const twilioClient = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
 // OpenAI client
 // --------------------
 //const openrouter = new OpenRouter({ apiKey: GPT_API_KEY })
-const openai = new OpenAI({ apiKey: OPENAI_KEY })
+const openai = new OpenAI({ apiKey: 
+  //OPENAI_KEY
+  GPT_API_KEY})
 
 // --------------------
 // Admin configuration
@@ -36,7 +43,7 @@ const ADMIN_TRIGGER = "Trigger max"     // Replace with your specific admin trig
 // --------------------
 // Target number to send messages to
 // --------------------
-const TARGET_NUMBER = "+971523534063" // Recipient of template & GPT reply
+const TARGET_NUMBER = "+254796143065" // Recipient of template & GPT reply
 
 // --------------------
 // Load prompts
@@ -82,9 +89,11 @@ async function sendWhatsAppMessage(toNumber, text) {
 // GPT reply function
 // --------------------
 async function generateGPTReply(userMessage) {
-  const completion = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
-    //model: "mistralai/mistral-7b-instruct",
+  const completion = 
+    //await openai.chat.completions.create({
+    //model: "gpt-4o-mini",
+    await axios.post("https://openrouter.ai/api/v1/chat/completions",{
+    model: "mistralai/mistral-7b-instruct",
     max_tokens: 400,
     temperature: 0.6,
     messages: [
@@ -95,7 +104,15 @@ async function generateGPTReply(userMessage) {
       //{ role: "system", content: OBJECTIONS },
       { role: "user", content: userMessage }
     ]
-  })
+  },
+  {
+      headers: {
+        "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://tutorii.com", // required by OpenRouter
+        "X-Title": "Tutorii WhatsApp Bot"
+      }
+    })
 
   return completion.choices[0].message.content
 }
