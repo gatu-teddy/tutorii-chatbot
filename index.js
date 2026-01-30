@@ -104,7 +104,9 @@ async function generateGPTReply(userMessage) {
       //{ role: "system", content: OBJECTIONS },
       { role: "user", content: userMessage }
     ]
-  },
+  }
+                     //for axios and openrouter
+,
   {
       headers: {
         "Authorization": `Bearer ${GPT_API_KEY}`,
@@ -114,7 +116,8 @@ async function generateGPTReply(userMessage) {
       }
     })
 
-  return completion.choices[0].message.content
+  //return completion.choices[0].message.content //openai
+       return response.data.choices[0].message.content
 }
 
 // --------------------
