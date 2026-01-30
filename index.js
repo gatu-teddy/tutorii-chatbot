@@ -3,7 +3,7 @@ import path from "path"
 import express from "express"
 import bodyParser from "body-parser"
 import twilio from "twilio"
-import OpenAI from "openai"
+//import OpenAI from "openai"
 import axios from "axios"
 //import {OpenRouter} from "@openrouter/sdk"
 
@@ -30,9 +30,8 @@ const twilioClient = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
 // OpenAI client
 // --------------------
 //const openrouter = new OpenRouter({ apiKey: GPT_API_KEY })
-const openai = new OpenAI({ apiKey: 
+//const openai = new OpenAI({ apiKey: GPT_API_KEY})
   //OPENAI_KEY
-  GPT_API_KEY})
 
 // --------------------
 // Admin configuration
@@ -104,11 +103,8 @@ async function generateGPTReply(userMessage) {
       //{ role: "system", content: OBJECTIONS },
       { role: "user", content: userMessage }
     ]
-  }
-                     //for axios and openrouter
-,
-  {
-      headers: {
+  },{
+      headers: { //for axios and openrouter
         "Authorization": `Bearer ${GPT_API_KEY}`,
         "Content-Type": "application/json",
         "HTTP-Referer": "https://tutorii.com", // required by OpenRouter
