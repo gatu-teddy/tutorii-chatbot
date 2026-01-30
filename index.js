@@ -88,10 +88,11 @@ async function sendWhatsAppMessage(toNumber, text) {
 // GPT reply function
 // --------------------
 async function generateGPTReply(userMessage) {
-  const completion = 
+  
     //await openai.chat.completions.create({
     //model: "gpt-4o-mini",
-    await axios.post("https://openrouter.ai/api/v1/chat/completions",{
+       const apiKey=process.env.GPT_API_KEY
+    const completion = await axios.post("https://openrouter.ai/api/v1/chat/completions",{
     model: "mistralai/mistral-7b-instruct",
     max_tokens: 400,
     temperature: 0.6,
@@ -103,17 +104,17 @@ async function generateGPTReply(userMessage) {
       //{ role: "system", content: OBJECTIONS },
       { role: "user", content: userMessage }
     ]
-  },{
+    },{
       headers: { //for axios and openrouter
-        "Authorization": `Bearer ${GPT_API_KEY}`,
+        "Authorization": `Bearer ${apiKey}`,
         "Content-Type": "application/json",
         "HTTP-Referer": "https://tutorii.com", // required by OpenRouter
         "X-Title": "Tutorii WhatsApp Bot"
       }
     })
-
+return response.data.choices[0].message.content
   //return completion.choices[0].message.content //openai
-       return response.data.choices[0].message.content
+       
 }
 
 // --------------------
