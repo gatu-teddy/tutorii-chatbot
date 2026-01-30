@@ -149,8 +149,10 @@ app.post("/webhook", async (req, res) => {
     console.log("Message ignored")
     return res.sendStatus(200)
   } catch (err) {
-    console.error("Error handling message:", err)
-    return res.sendStatus(500)
+  console.error("FULL ERROR RESPONSE:", JSON.stringify(err.response?.data, null, 2))
+  console.error("STATUS:", err.response?.status)
+  console.error("HEADERS:", err.response?.headers)
+  return res.sendStatus(500)
   }
 })
 // --------------------
