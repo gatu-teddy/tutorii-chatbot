@@ -42,7 +42,7 @@ const ADMIN_TRIGGER = "Trigger max"     // Replace with your specific admin trig
 // --------------------
 // Target number to send messages to
 // --------------------
-const TARGET_NUMBER = "+254796143065" // Recipient of template & GPT reply
+const TARGET_NUMBER = "+971501830069" // Recipient of template & GPT reply
 
 // --------------------
 // Load prompts
