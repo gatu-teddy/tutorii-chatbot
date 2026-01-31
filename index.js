@@ -35,7 +35,7 @@ const ADMIN_TRIGGER = "trigger max"
 // --------------------
 // Target number
 // --------------------
-const TARGET_NUMBER = "+971501830069"
+const TARGET_NUMBER = "+254796143065"
 
 // --------------------
 // Load prompts
