@@ -52,6 +52,8 @@ const SYSTEM_PROMPT = [
   loadPrompt("EarningsLogic.txt")
 ].join("\n\n")
 
+const LENGTH_RULE = `Reply in 2–3 short sentences. Maximum 60 words. Ask only one question. No formatting.`
+
 // --------------------
 // Twilio send functions
 // --------------------
@@ -84,6 +86,7 @@ async function generateGPTReply(userMessage) {
         max_tokens: 300,
         temperature: 0.6,
         messages: [
+          { role: "system", content: LENGTH_RULE },
           { role: "system", content: SYSTEM_PROMPT },
           { role: "user", content: userMessage }
         ]
