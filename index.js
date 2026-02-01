@@ -37,6 +37,26 @@ const ADMIN_TRIGGER = "trigger max"
 // --------------------
 const TARGET_NUMBER = "+254796143065"
 
+//---
+//user state
+//
+const userState = {}
+
+function getUserState(userNumber) {
+  if (!userState[userNumber]) {
+    userState[userNumber] = {
+      stage: "STAGE_1", // default starting stage
+      linkSent: false
+    }
+  }
+  return userState[userNumber]
+}
+
+function advanceStage(userNumber, nextStage) {
+  const state = getUserState(userNumber)
+  state.stage = nextStage
+}
+
 // --------------------
 // Load prompts
 // --------------------
@@ -53,6 +73,10 @@ const SYSTEM_PROMPT = [
 ].join("\n\n")
 
 const LENGTH_RULE = `Reply in 2–3 short sentences. Maximum 60 words. Ask only one question. No formatting.`
+
+function userGaveConsent(text) {
+  return /^(yes|yeah|yep|sure|send|send it|okay|cool|great|definitely|ok|fine)$/i.test(text)
+}
 
 // --------------------
 // Twilio send functions
@@ -113,6 +137,37 @@ async function generateGPTReply(userMessage) {
   }
 }
 
+async function handleUserMessage(from, message) {
+  const state = getUserState(from)
+  let reply = ""
+
+  if (state.stage === "STAGE_1") {
+    reply = await generateGPTReply(message)
+    advanceStage(from, "STAGE_2")
+  }
+  else if (state.stage === "STAGE_2") {
+    reply = await generateGPTReply(message)
+    advanceStage(from, "STAGE_3")
+  }
+  else if (state.stage === "STAGE_3") {
+    reply = await generateGPTReply(message)
+    advanceStage(from, "STAGE_10")
+  }
+  else if (state.stage === "STAGE_10") {
+    if (/yes|sure|ok|send/i.test(message) && !state.linkSent) {
+      await sendWhatsAppMessage(from, "Here’s the Tutorii link to get started: https://tutorii.com")
+      state.linkSent = true
+      reply = "✅ Link sent. You can explore Tutorii now."
+    } else {
+      reply = await generateGPTReply(message)
+    }
+  } else {
+    reply = await generateGPTReply(message)
+  }
+
+  return reply
+}
+
 // --------------------
 // Express webhook server
 // --------------------
@@ -134,12 +189,34 @@ app.post("/webhook", async (req, res) => {
     }
 
     // User reply
-    if (from === TARGET_NUMBER) {
-      const reply = await generateGPTReply(body)
-      await sendWhatsAppMessage(TARGET_NUMBER, reply)
-      console.log("✅ GPT reply sent")
-      return res.sendStatus(200)
-    }
+  // User reply
+if (from === TARGET_NUMBER) {
+  const state = getUserState(from) // unified state
+
+  // 1️⃣ If user consented and stage is closing
+  if (userGaveConsent(body) && state.stage === "STAGE_10" && !state.linkSent) {
+    await sendWhatsAppMessage(
+      from,
+      "Here’s the link to explore Tutorii:\nhttps://tutorii.com"
+    )
+    state.linkSent = true
+    console.log("✅ Link sent after user consent")
+    return res.sendStatus(200)
+  }
+
+  // 2️⃣ If link already sent → do nothing
+  if (state.linkSent) {
+    console.log("ℹ️ Link already sent, ignoring further messages")
+    return res.sendStatus(200)
+  }
+
+  // 3️⃣ Otherwise → GPT may respond and advance stage
+  const reply = await handleUserMessage(from, body)
+  await sendWhatsAppMessage(TARGET_NUMBER, reply)
+
+  console.log("✅ GPT reply sent / action taken")
+  return res.sendStatus(200)
+}
 
     return res.sendStatus(200)
 
