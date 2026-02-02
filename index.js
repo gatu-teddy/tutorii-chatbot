@@ -38,8 +38,8 @@ const ADMIN_TRIGGER = "trigger max"
 //const TARGET_NUMBER = "+254796143065"
 const TARGET_NUMBERS = [
   "+254796143065",
-  "+971501234567",
-  "+254712345678"
+  "+971501830069",
+  "+971523534063"
 ]
 
 //---
@@ -229,13 +229,13 @@ if (TARGET_NUMBERS.includes(from)) {
     )
     state.linkSent = true
     console.log("✅ Link sent after user consent")
-return res.status(200).end()
+//return res.status(200).end()
   }
 
   // 2️⃣ If link already sent → do nothing
   if (state.linkSent) {
     console.log("ℹ️ Link already sent, ignoring further messages")
-return res.status(200).end()
+//return res.status(200).end()
   }
 
   // 3️⃣ Otherwise → GPT may respond and advance stage
