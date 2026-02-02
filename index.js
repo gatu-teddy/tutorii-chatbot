@@ -35,7 +35,12 @@ const ADMIN_TRIGGER = "trigger max"
 // --------------------
 // Target number
 // --------------------
-const TARGET_NUMBER = "+254796143065"
+//const TARGET_NUMBER = "+254796143065"
+const TARGET_NUMBERS = [
+  "+254796143065",
+  "+971501234567",
+  "+254712345678"
+]
 
 //---
 //user state
@@ -203,7 +208,10 @@ app.post("/webhook", async (req, res) => {
   try {
     // Admin trigger
     if (from === ADMIN_NUMBER && body.toLowerCase() === ADMIN_TRIGGER) {
-      await sendTemplate(TARGET_NUMBER)
+      //await sendTemplate(TARGET_NUMBER)
+      for (const number of TARGET_NUMBERS) {
+  await sendTemplate(number)
+}
       console.log("✅ Template sent")
       return res.sendStatus(200)
     }
@@ -217,7 +225,7 @@ if (from === TARGET_NUMBER) {
   if (userGaveConsent(body) && state.stage === "STAGE_10" && !state.linkSent) {
     await sendWhatsAppMessage(
       from,
-      "Here’s the link to explore Tutorii:\nhttps://tutorii.com"
+      "Feel Free to explore the platform:\nhttps://tutorii.com\n use 'TTRI-business-admin' as a sponsor if you do not have a referall."
     )
     state.linkSent = true
     console.log("✅ Link sent after user consent")
@@ -232,14 +240,14 @@ if (from === TARGET_NUMBER) {
 
   // 3️⃣ Otherwise → GPT may respond and advance stage
   const reply = await handleUserMessage(from, body)
-  await sendWhatsAppMessage(TARGET_NUMBER, reply)
+  await sendWhatsAppMessage(from, reply)
 
   console.log("✅ GPT reply sent / action taken")
   //return res.sendStatus(200)
 }
 
-    res.writeHead(200, { "Content-Type": "text/xml" })
-    res.end(twiml.toString())
+    //res.writeHead(200, { "Content-Type": "text/xml" })
+    //res.end(twiml.toString())
 
   } catch (err) {
     console.error("❌ Webhook error")
