@@ -46,7 +46,8 @@ function getUserState(userNumber) {
   if (!userState[userNumber]) {
     userState[userNumber] = {
       stage: "STAGE_1", // default starting stage
-      linkSent: false
+      linkSent: false,
+      history: []
     }
   }
   return userState[userNumber]
@@ -101,7 +102,7 @@ async function sendWhatsAppMessage(toNumber, text) {
 // --------------------
 // OpenRouter GPT function
 // --------------------
-async function generateGPTReply(userMessage) {
+async function generateGPTReply(history, userMessage) {
   try {
     const response = await axios.post(
       "https://openrouter.ai/api/v1/chat/completions",
@@ -112,6 +113,7 @@ async function generateGPTReply(userMessage) {
         messages: [
           { role: "system", content: LENGTH_RULE },
           { role: "system", content: SYSTEM_PROMPT },
+          ...history,
           { role: "user", content: userMessage }
         ]
       },
@@ -138,34 +140,39 @@ async function generateGPTReply(userMessage) {
 }
 
 async function handleUserMessage(from, message) {
-  const state = getUserState(from)
-  let reply = ""
+  const state = getUserState(from);
 
+  // 1️⃣ Save user message to history
+  state.history.push({ role: "user", content: message });
+
+  let reply = "";
+
+  // 2️⃣ Generate GPT reply based on full history
   if (state.stage === "STAGE_1") {
-    reply = await generateGPTReply(message)
-    advanceStage(from, "STAGE_2")
-  }
-  else if (state.stage === "STAGE_2") {
-    reply = await generateGPTReply(message)
-    advanceStage(from, "STAGE_3")
-  }
-  else if (state.stage === "STAGE_3") {
-    reply = await generateGPTReply(message)
-    advanceStage(from, "STAGE_10")
-  }
-  else if (state.stage === "STAGE_10") {
+    reply = await generateGPTReply(state.history, message);
+    advanceStage(from, "STAGE_2");
+  } else if (state.stage === "STAGE_2") {
+    reply = await generateGPTReply(state.history, message);
+    advanceStage(from, "STAGE_3");
+  } else if (state.stage === "STAGE_3") {
+    reply = await generateGPTReply(state.history, message);
+    advanceStage(from, "STAGE_10");
+  } else if (state.stage === "STAGE_10") {
     if (/yes|sure|ok|send/i.test(message) && !state.linkSent) {
-      await sendWhatsAppMessage(from, "Here’s the Tutorii link to get started: https://tutorii.com")
-      state.linkSent = true
-      reply = "✅ Link sent. You can explore Tutorii now."
+      await sendWhatsAppMessage(from, "Here’s the Tutorii link to get started: https://tutorii.com");
+      state.linkSent = true;
+      reply = "✅ Link sent. You can explore Tutorii now.";
     } else {
-      reply = await generateGPTReply(message)
+      reply = await generateGPTReply(state.history, message);
     }
   } else {
-    reply = await generateGPTReply(message)
+    reply = await generateGPTReply(state.history, message);
   }
 
-  return reply
+  // 3️⃣ Save assistant reply to history
+  state.history.push({ role: "assistant", content: reply });
+
+  return reply;
 }
 
 // --------------------
