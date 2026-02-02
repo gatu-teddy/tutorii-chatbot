@@ -156,7 +156,20 @@ async function handleUserMessage(from, message) {
     advanceStage(from, "STAGE_3");
   } else if (state.stage === "STAGE_3") {
     reply = await generateGPTReply(state.history, message);
-    advanceStage(from, "STAGE_10");
+    // Decide next stage based on user objection or not
+    if (/no|not interested|don't want|never/i.test(message)) {
+      advanceStage(from, "STAGE_9"); // user objects → stage 9
+    } else {
+      advanceStage(from, "STAGE_10"); // normal flow → stage 10
+    }
+  } else if (state.stage === "STAGE_9") {
+    // Stage 9: Objection handling
+    reply = await generateGPTReply(state.history, message);
+
+    // Optionally, decide if they come back to stage 10 later
+    if (/ok|sure|maybe/i.test(message)) {
+      advanceStage(from, "STAGE_10");
+    }
   } else if (state.stage === "STAGE_10") {
     if (/yes|sure|ok|send/i.test(message) && !state.linkSent) {
       await sendWhatsAppMessage(from, "Here’s the Tutorii link to get started: https://tutorii.com");
