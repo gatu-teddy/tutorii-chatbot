@@ -213,12 +213,12 @@ app.post("/webhook", async (req, res) => {
   await sendTemplate(number)
 }
       console.log("✅ Template sent")
-      return res.sendStatus(200)
+return res.status(200).end()
     }
 
     // User reply
   // User reply
-if (from === TARGET_NUMBER) {
+if (TARGET_NUMBERS.includes(from)) {
   const state = getUserState(from) // unified state
 
   // 1️⃣ If user consented and stage is closing
@@ -229,13 +229,13 @@ if (from === TARGET_NUMBER) {
     )
     state.linkSent = true
     console.log("✅ Link sent after user consent")
-    //return res.sendStatus(200)
+return res.status(200).end()
   }
 
   // 2️⃣ If link already sent → do nothing
   if (state.linkSent) {
     console.log("ℹ️ Link already sent, ignoring further messages")
-    //return res.sendStatus(200)
+return res.status(200).end()
   }
 
   // 3️⃣ Otherwise → GPT may respond and advance stage
@@ -245,7 +245,7 @@ if (from === TARGET_NUMBER) {
   console.log("✅ GPT reply sent / action taken")
   //return res.sendStatus(200)
 }
-
+return res.status(200).end()
     //res.writeHead(200, { "Content-Type": "text/xml" })
     //res.end(twiml.toString())
 
