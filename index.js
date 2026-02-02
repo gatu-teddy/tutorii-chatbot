@@ -238,7 +238,8 @@ if (from === TARGET_NUMBER) {
   //return res.sendStatus(200)
 }
 
-    return res.sendStatus(200)
+    res.writeHead(200, { "Content-Type": "text/xml" })
+    res.end(twiml.toString())
 
   } catch (err) {
     console.error("❌ Webhook error")
