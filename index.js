@@ -5,9 +5,9 @@ import bodyParser from "body-parser"
 import twilio from "twilio"
 import axios from "axios"
 
-// --------------------
-// ENV VARIABLES
-// --------------------
+/* =====================
+   ENV VARIABLES
+===================== */
 const {
   TWILIO_ACCOUNT_SID,
   TWILIO_AUTH_TOKEN,
@@ -15,42 +15,39 @@ const {
 } = process.env
 
 if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !GPT_API_KEY) {
-  console.error("❌ Missing environment variables.")
+  console.error("❌ Missing environment variables")
   process.exit(1)
 }
 
-console.log("✅ GPT_API_KEY loaded:", !!GPT_API_KEY)
+/* =====================
+   TWILIO CLIENT
+===================== */
+const twilioClient = twilio(
+  TWILIO_ACCOUNT_SID,
+  TWILIO_AUTH_TOKEN
+)
 
-// --------------------
-// Twilio client
-// --------------------
-const twilioClient = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
-
-// --------------------
-// Admin configuration
-// --------------------
+/* =====================
+   CONFIG
+===================== */
 const ADMIN_NUMBER = "+971567728465"
 const ADMIN_TRIGGER = "trigger max"
 
-// --------------------
-// Target number
-// --------------------
-//const TARGET_NUMBER = "+254796143065"
 const TARGET_NUMBERS = [
   "+254796143065",
-  "+971501830069",
-  "+971523534063"
+  //"+971501830069",
+  //"+971523534063"
 ]
 
-//---
-//user state
-//
+/* =====================
+   IN-MEMORY USER STATE
+===================== */
 const userState = {}
 
 function getUserState(userNumber) {
   if (!userState[userNumber]) {
     userState[userNumber] = {
-      stage: "STAGE_1", // default starting stage
+      stage: "STAGE_1",
       linkSent: false,
       history: []
     }
@@ -59,13 +56,38 @@ function getUserState(userNumber) {
 }
 
 function advanceStage(userNumber, nextStage) {
-  const state = getUserState(userNumber)
-  state.stage = nextStage
+  userState[userNumber].stage = nextStage
 }
 
-// --------------------
-// Load prompts
-// --------------------
+/* =====================
+   DELAY + SEND HELPERS
+===================== */
+function delay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+async function sendDelayedMessage({ to, body }) {
+  await delay(30000)
+
+  return twilioClient.messages.create({
+    from: "whatsapp:+971504095079",
+    to: `whatsapp:${to}`,
+    body
+  })
+}
+
+async function sendTemplate(toNumber) {
+  return twilioClient.messages.create({
+    from: "whatsapp:+971504095079",
+    to: `whatsapp:${toNumber}`,
+    contentSid: "HXf5f95d60ca9dc0f4ce743de60376fbb2",
+    contentVariables: JSON.stringify({ 1: "there" })
+  })
+}
+
+/* =====================
+   PROMPTS
+===================== */
 const PROMPTS_DIR = path.join(process.cwd(), "Prompts")
 
 function loadPrompt(filename) {
@@ -78,186 +100,139 @@ const SYSTEM_PROMPT = [
   loadPrompt("EarningsLogic.txt")
 ].join("\n\n")
 
-const LENGTH_RULE = `Reply in 2–3 short sentences. Maximum 60 words. Ask only one question. No formatting.`
+const LENGTH_RULE =
+  "Reply in 2–3 short sentences. Maximum 60 words. Ask only one question. No formatting."
 
-function userGaveConsent(text) {
-  return /^(yes|yeah|yep|sure|send|send it|okay|cool|great|definitely|ok|fine)$/i.test(text)
-}
-
-// --------------------
-// Twilio send functions
-// --------------------
-async function sendTemplate(toNumber) {
-  return twilioClient.messages.create({
-    from: "whatsapp:+971504095079",
-    to: `whatsapp:${toNumber}`,
-    contentSid: "HXf5f95d60ca9dc0f4ce743de60376fbb2",
-    contentVariables: JSON.stringify({ 1: "there" })
-  })
-}
-
-async function sendWhatsAppMessage(toNumber, text) {
-  return twilioClient.messages.create({
-    from: "whatsapp:+971504095079",
-    to: `whatsapp:${toNumber}`,
-    body: text
-  })
-}
-
-// --------------------
-// OpenRouter GPT function
-// --------------------
+/* =====================
+   GPT FUNCTION
+===================== */
 async function generateGPTReply(history, userMessage) {
-  try {
-    const response = await axios.post(
-      "https://openrouter.ai/api/v1/chat/completions",
-      {
-        model: "mistralai/mistral-7b-instruct",
-        max_tokens: 300,
-        temperature: 0.6,
-        messages: [
-          { role: "system", content: LENGTH_RULE },
-          { role: "system", content: SYSTEM_PROMPT },
-          ...history,
-          { role: "user", content: userMessage }
-        ]
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${GPT_API_KEY}`,
-          "Content-Type": "application/json",
-          "HTTP-Referer": "https://tutorii.com",
-          "X-Title": "Tutorii WhatsApp Bot"
-        }
+  const response = await axios.post(
+    "https://openrouter.ai/api/v1/chat/completions",
+    {
+      model: "mistralai/mistral-7b-instruct",
+      temperature: 0.6,
+      max_tokens: 300,
+      messages: [
+        { role: "system", content: LENGTH_RULE },
+        { role: "system", content: SYSTEM_PROMPT },
+        ...history,
+        { role: "user", content: userMessage }
+      ]
+    },
+    {
+      headers: {
+        Authorization: `Bearer ${GPT_API_KEY}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://tutorii.com",
+        "X-Title": "Tutorii WhatsApp Bot"
       }
-    )
+    }
+  )
 
-    return response.data.choices[0].message.content
-
-  } catch (err) {
-    console.error("❌ OpenRouter ERROR")
-    console.error("Message:", err.message)
-    console.error("Status:", err.response?.status)
-    console.error("Headers:", err.response?.headers)
-    console.error("Data:", JSON.stringify(err.response?.data, null, 2))
-    throw err
-  }
+  return response.data.choices[0].message.content
 }
 
+/* =====================
+   CONSENT CHECK
+===================== */
+function userGaveConsent(text) {
+  return /^(yes|ok|sure|send|send it|okay)$/i.test(text)
+}
+
+/* =====================
+   CORE LOGIC (ONLY PLACE THAT SENDS WHATSAPP)
+===================== */
 async function handleUserMessage(from, message) {
-  const state = getUserState(from);
+  const state = getUserState(from)
 
-  // 1️⃣ Save user message to history
-  state.history.push({ role: "user", content: message });
+  // Save user message
+  state.history.push({ role: "user", content: message })
 
-  let reply = "";
+  let reply = ""
 
-  // 2️⃣ Generate GPT reply based on full history
-  if (state.stage === "STAGE_1") {
-    reply = await generateGPTReply(state.history, message);
-    advanceStage(from, "STAGE_2");
-  } else if (state.stage === "STAGE_2") {
-    reply = await generateGPTReply(state.history, message);
-    advanceStage(from, "STAGE_3");
-  } else if (state.stage === "STAGE_3") {
-    reply = await generateGPTReply(state.history, message);
-    // Decide next stage based on user objection or not
-    if (/no|not interested|don't want|never/i.test(message)) {
-      advanceStage(from, "STAGE_9"); // user objects → stage 9
-    } else {
-      advanceStage(from, "STAGE_10"); // normal flow → stage 10
-    }
-  } else if (state.stage === "STAGE_9") {
-    // Stage 9: Objection handling
-    reply = await generateGPTReply(state.history, message);
+  switch (state.stage) {
+    case "STAGE_1":
+      reply = await generateGPTReply(state.history, message)
+      advanceStage(from, "STAGE_2")
+      break
 
-    // Optionally, decide if they come back to stage 10 later
-    if (/ok|sure|maybe/i.test(message)) {
-      advanceStage(from, "STAGE_10");
-    }
-  } else if (state.stage === "STAGE_10") {
-    if (/yes|sure|ok|send/i.test(message) && !state.linkSent) {
-      await sendWhatsAppMessage(from, "Here’s the Tutorii link to get started: https://tutorii.com");
-      state.linkSent = true;
-      reply = "✅ Link sent. You can explore Tutorii now.";
-    } else {
-      reply = await generateGPTReply(state.history, message);
-    }
-  } else {
-    reply = await generateGPTReply(state.history, message);
+    case "STAGE_2":
+      reply = await generateGPTReply(state.history, message)
+      advanceStage(from, "STAGE_3")
+      break
+
+    case "STAGE_3":
+      reply = await generateGPTReply(state.history, message)
+      advanceStage(from, "STAGE_10")
+      break
+
+    case "STAGE_10":
+      if (userGaveConsent(message) && !state.linkSent) {
+        await sendDelayedMessage({
+          to: from,
+          body:
+            "Here’s the Tutorii link:\nhttps://tutorii.com\nUse sponsor: TTRI-business-admin"
+        })
+        state.linkSent = true
+        return
+      }
+
+      reply = await generateGPTReply(state.history, message)
+      break
+
+    default:
+      reply = await generateGPTReply(state.history, message)
   }
 
-  // 3️⃣ Save assistant reply to history
-  state.history.push({ role: "assistant", content: reply });
+  // Save assistant reply
+  state.history.push({ role: "assistant", content: reply })
 
-  return reply;
+  await sendDelayedMessage({
+    to: from,
+    body: reply
+  })
 }
 
-// --------------------
-// Express webhook server
-// --------------------
+/* =====================
+   EXPRESS WEBHOOK
+   (NO WHATSAPP SENDS HERE)
+===================== */
 const app = express()
 app.use(bodyParser.urlencoded({ extended: false }))
 
 app.post("/webhook", async (req, res) => {
-  const from = req.body.From?.replace("whatsapp:", "")
-  const body = req.body.Body?.trim()
-
-  console.log("📩 Incoming:", from, body)
-
   try {
+    const from = req.body.From?.replace("whatsapp:", "")
+    const body = req.body.Body?.trim() || ""
+
+    console.log("📩 Incoming:", from, body)
+
     // Admin trigger
     if (from === ADMIN_NUMBER && body.toLowerCase() === ADMIN_TRIGGER) {
-      //await sendTemplate(TARGET_NUMBER)
       for (const number of TARGET_NUMBERS) {
-  await sendTemplate(number)
-}
-      console.log("✅ Template sent")
-return res.status(200).end()
+        await sendTemplate(number)
+      }
+      return res.sendStatus(200)
     }
 
-    // User reply
-  // User reply
-if (TARGET_NUMBERS.includes(from)) {
-  const state = getUserState(from) // unified state
+    // Only process target users
+    if (TARGET_NUMBERS.includes(from)) {
+      await handleUserMessage(from, body)
+    }
 
-  // 1️⃣ If user consented and stage is closing
-  if (userGaveConsent(body) && state.stage === "STAGE_10" && !state.linkSent) {
-    await sendWhatsAppMessage(
-      from,
-      "Feel Free to explore the platform:\nhttps://tutorii.com\n use 'TTRI-business-admin' as a sponsor if you do not have a referall."
-    )
-    state.linkSent = true
-    console.log("✅ Link sent after user consent")
-//return res.status(200).end()
-  }
-
-  // 2️⃣ If link already sent → do nothing
-  if (state.linkSent) {
-    console.log("ℹ️ Link already sent, ignoring further messages")
-//return res.status(200).end()
-  }
-
-  // 3️⃣ Otherwise → GPT may respond and advance stage
-  const reply = await handleUserMessage(from, body)
-  await sendWhatsAppMessage(from, reply)
-
-  console.log("✅ GPT reply sent / action taken")
-  //return res.sendStatus(200)
-}
-return res.status(200).end()
-    //res.writeHead(200, { "Content-Type": "text/xml" })
-    //res.end(twiml.toString())
+    // EXACTLY ONE RESPONSE
+    return res.sendStatus(200)
 
   } catch (err) {
-    console.error("❌ Webhook error")
+    console.error("❌ Webhook error:", err)
     return res.sendStatus(500)
   }
 })
 
-// --------------------
-// Start server
-// --------------------
+/* =====================
+   START SERVER
+===================== */
 const PORT = process.env.PORT || 3000
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`)
