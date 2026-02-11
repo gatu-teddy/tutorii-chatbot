@@ -35,6 +35,7 @@ const ADMIN_TRIGGER = "trigger max"
 
 const TARGET_NUMBERS = [
   "+254796143065",
+   "+447826939737"
   //"+971501830069",
   //"+971523534063"
 ]
