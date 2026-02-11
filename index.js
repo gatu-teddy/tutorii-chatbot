@@ -112,7 +112,7 @@ const LENGTH_RULE =
 async function generateGPTReply(history, userMessage) {
   const response = await axios.post(
     //"https://openrouter.ai/api/v1/chat/completions",
-     "https://api.openai.com/v1/responses",
+     "https://api.openai.com/v1/chat/completions",
     {
       //model: "mistralai/mistral-7b-instruct",
        model: "gpt-4o-mini",
