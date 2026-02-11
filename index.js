@@ -11,6 +11,7 @@ import axios from "axios"
 const {
   TWILIO_ACCOUNT_SID,
   TWILIO_AUTH_TOKEN,
+   OPENAI_KEY,
   GPT_API_KEY
 } = process.env
 
@@ -35,7 +36,7 @@ const ADMIN_TRIGGER = "trigger max"
 
 const TARGET_NUMBERS = [
   "+254796143065",
-   "+447826939737"
+   //"+447826939737"
   //"+971501830069",
   //"+971523534063"
 ]
@@ -109,9 +110,11 @@ const LENGTH_RULE =
 ===================== */
 async function generateGPTReply(history, userMessage) {
   const response = await axios.post(
-    "https://openrouter.ai/api/v1/chat/completions",
+    //"https://openrouter.ai/api/v1/chat/completions",
+     "https://api.openai.com/v1/responses",
     {
-      model: "mistralai/mistral-7b-instruct",
+      //model: "mistralai/mistral-7b-instruct",
+       model: "gpt-4o-mini",
       temperature: 0.6,
       max_tokens: 300,
       messages: [
@@ -123,10 +126,10 @@ async function generateGPTReply(history, userMessage) {
     },
     {
       headers: {
-        Authorization: `Bearer ${GPT_API_KEY}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://tutorii.com",
-        "X-Title": "Tutorii WhatsApp Bot"
+        Authorization: `Bearer ${OPENAI_KEY}`,
+        "Content-Type": "application/json"
+        //"HTTP-Referer": "https://tutorii.com",
+        //"X-Title": "Tutorii WhatsApp Bot"
       }
     }
   )
