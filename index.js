@@ -4,7 +4,8 @@ import express from "express"
 import bodyParser from "body-parser"
 import twilio from "twilio"
 import axios from "axios"
-
+import dotenv from "dotenv";
+dotenv.config();
 /* =====================
    ENV VARIABLES
 ===================== */
@@ -38,7 +39,8 @@ const TARGET_NUMBERS = [
   "+254796143065",
    "+971567728465",
    "+447826939737",
-  "+971501830069"
+  "+971501830069",
+  "+923045172021"
   //"+971523534063"
 ]
 
