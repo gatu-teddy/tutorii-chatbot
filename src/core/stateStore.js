@@ -1,4 +1,4 @@
-import { STAGES, STAGE_RANK } from "./stages.js"
+import { STAGES, STAGE_RANK } from "../constants/stages.js"
 
 const userStateByNumber = new Map()
 
@@ -35,4 +35,3 @@ export function appendHistory(state, role, content, maxHistoryMessages) {
     state.history.splice(0, state.history.length - maxHistoryMessages)
   }
 }
-

@@ -1,9 +1,9 @@
 import twilio from "twilio"
-import { config } from "./src/config.js"
-import { createOpenAIClient } from "./src/openaiClient.js"
-import { createPromptManager } from "./src/promptManager.js"
-import { createConversationEngine } from "./src/conversationEngine.js"
-import { createServer } from "./src/server.js"
+import { config } from "./src/config/index.js"
+import { createOpenAIClient } from "./src/services/openaiClient.js"
+import { createPromptManager } from "./src/services/promptManager.js"
+import { createConversationEngine } from "./src/core/conversationEngine.js"
+import { createServer } from "./src/http/server.js"
 
 const twilioClient = twilio(
   config.twilio.accountSid,

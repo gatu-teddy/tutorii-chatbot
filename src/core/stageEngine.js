@@ -1,5 +1,5 @@
-import { STAGES } from "./stages.js"
-import { normalizeText } from "./utils.js"
+import { STAGES } from "../constants/stages.js"
+import { normalizeText } from "../utils/index.js"
 
 const INTEREST_PATTERNS = [
   /\b(interested|tell me more|what is|what's this|how does it work|details|explain)\b/i,
@@ -78,4 +78,3 @@ export function detectNextStage(state, message) {
 
   return state.stage
 }
-

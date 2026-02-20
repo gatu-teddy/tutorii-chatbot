@@ -1,5 +1,5 @@
-import { delay, normalizeText } from "./utils.js"
-import { STAGES } from "./stages.js"
+import { delay, normalizeText } from "../utils/index.js"
+import { STAGES } from "../constants/stages.js"
 import { appendHistory, advanceStage, getUserState } from "./stateStore.js"
 import { detectNextStage, userGaveConsent, userOptedOut } from "./stageEngine.js"
 
@@ -237,4 +237,3 @@ export function createConversationEngine({
     triggerTemplateCampaign
   }
 }
-

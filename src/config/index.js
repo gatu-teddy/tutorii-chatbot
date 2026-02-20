@@ -1,7 +1,7 @@
 import fs from "fs"
 import path from "path"
 import dotenv from "dotenv"
-import { normalizeNumber, toPositiveNumber } from "./utils.js"
+import { normalizeNumber, toPositiveNumber } from "../utils/index.js"
 
 dotenv.config()
 
@@ -13,8 +13,23 @@ const DEFAULT_TARGET_NUMBERS = [
   "+923045172021"
 ]
 
-const PROMPTS_DIR = path.join(process.cwd(), "prompt")
 const TARGETS_FILE = path.join(process.cwd(), "targets.json")
+
+function resolvePromptsDir() {
+  const candidates = [
+    path.join(process.cwd(), "prompts"),
+    path.join(process.cwd(), "prompt"),
+    path.join(process.cwd(), "Prompts")
+  ]
+
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate) && fs.statSync(candidate).isDirectory()) {
+      return candidate
+    }
+  }
+
+  return candidates[0]
+}
 
 function loadTargetNumbers() {
   if (!fs.existsSync(TARGETS_FILE)) {
@@ -52,7 +67,7 @@ const openAIApiKey = process.env.OPENAI_KEY || process.env.GPT_API_KEY
 
 export const config = {
   port: toPositiveNumber(process.env.PORT, 3000),
-  promptsDir: PROMPTS_DIR,
+  promptsDir: resolvePromptsDir(),
   targets: loadTargetNumbers(),
   admin: {
     number: normalizeNumber(process.env.ADMIN_NUMBER || "+971567728465"),
@@ -94,4 +109,3 @@ export const config = {
     sponsorCode: process.env.TUTORII_SPONSOR_CODE || "TTRI-business-admin"
   }
 }
-

@@ -1,6 +1,6 @@
 import express from "express"
 import bodyParser from "body-parser"
-import { normalizeNumber } from "./utils.js"
+import { normalizeNumber } from "../utils/index.js"
 
 export function createServer({ config, conversationEngine }) {
   const app = express()
@@ -44,4 +44,3 @@ export function createServer({ config, conversationEngine }) {
 
   return app
 }
-

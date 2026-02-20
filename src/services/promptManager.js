@@ -1,6 +1,6 @@
 import fs from "fs"
 import path from "path"
-import { STAGES } from "./stages.js"
+import { STAGES } from "../constants/stages.js"
 
 const STAGE_DIRECTIVES = {
   [STAGES.INITIAL]:
@@ -24,9 +24,9 @@ function safeRead(filePath) {
 
 function loadKnowledge(promptsDir) {
   const promptFiles = [
-    "coreRules.txt",
-    "stagePlaybook.txt",
-    "earningsLogic.txt"
+    "core-rules.txt",
+    "stage-playbook.txt",
+    "earnings-logic.txt"
   ]
 
   return promptFiles
@@ -89,4 +89,3 @@ export function createPromptManager({ promptsDir }) {
     }
   }
 }
-
