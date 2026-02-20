@@ -13,7 +13,7 @@ const DEFAULT_TARGET_NUMBERS = [
   "+923045172021"
 ]
 
-const PROMPTS_DIR = path.join(process.cwd(), "Prompts")
+const PROMPTS_DIR = path.join(process.cwd(), "prompt")
 const TARGETS_FILE = path.join(process.cwd(), "targets.json")
 
 function loadTargetNumbers() {

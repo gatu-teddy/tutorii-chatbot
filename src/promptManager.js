@@ -24,9 +24,9 @@ function safeRead(filePath) {
 
 function loadKnowledge(promptsDir) {
   const promptFiles = [
-    "CoreRules.txt",
-    "StagePlaybook.txt",
-    "EarningsLogic.txt"
+    "coreRules.txt",
+    "stagePlaybook.txt",
+    "earningsLogic.txt"
   ]
 
   return promptFiles
