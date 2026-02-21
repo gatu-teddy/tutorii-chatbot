@@ -49,6 +49,11 @@ function getRequired(key, value) {
 }
 
 const openAIApiKey = process.env.OPENAI_KEY || process.env.GPT_API_KEY
+const postgresSslMode = String(process.env.PGSSLMODE || process.env.PGSSL || "")
+  .trim()
+  .toLowerCase()
+const postgresSslEnabled = ["1", "true", "yes", "require"].includes(postgresSslMode)
+const postgresEnabled = Boolean(process.env.DATABASE_URL || process.env.PGHOST)
 
 export const config = {
   port: toPositiveNumber(process.env.PORT, 3000),
@@ -71,8 +76,14 @@ export const config = {
     model: process.env.OPENAI_MODEL || "gpt-4o-mini",
     temperature: Number.isFinite(Number(process.env.OPENAI_TEMPERATURE))
       ? Number(process.env.OPENAI_TEMPERATURE)
-      : 0.45,
-    maxTokens: toPositiveNumber(process.env.OPENAI_MAX_TOKENS, 220)
+      : 0.6,
+    maxTokens: toPositiveNumber(process.env.OPENAI_MAX_TOKENS, 220),
+    frequencyPenalty: Number.isFinite(Number(process.env.OPENAI_FREQUENCY_PENALTY))
+      ? Number(process.env.OPENAI_FREQUENCY_PENALTY)
+      : 0.3,
+    presencePenalty: Number.isFinite(Number(process.env.OPENAI_PRESENCE_PENALTY))
+      ? Number(process.env.OPENAI_PRESENCE_PENALTY)
+      : 0.15
   },
   campaign: {
     staggerMs: toPositiveNumber(process.env.CAMPAIGN_STAGGER_MS, 1800)
@@ -88,6 +99,16 @@ export const config = {
     minResponseDelayMs: toPositiveNumber(process.env.MIN_RESPONSE_DELAY_MS, 1200),
     maxResponseDelayMs: toPositiveNumber(process.env.MAX_RESPONSE_DELAY_MS, 7000),
     maxHistoryMessages: toPositiveNumber(process.env.MAX_HISTORY_MESSAGES, 20)
+  },
+  postgres: {
+    enabled: postgresEnabled,
+    connectionString: process.env.DATABASE_URL || "",
+    host: process.env.PGHOST || "",
+    port: toPositiveNumber(process.env.PGPORT, 5432),
+    user: process.env.PGUSER || "",
+    password: process.env.PGPASSWORD || "",
+    database: process.env.PGDATABASE || "",
+    ssl: postgresSslEnabled
   },
   links: {
     signup: process.env.TUTORII_SIGNUP_LINK || "https://tutorii.com",

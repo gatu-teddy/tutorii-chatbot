@@ -1,20 +1,79 @@
 import { STAGES, STAGE_RANK } from "../constants/stages.js"
 
 const userStateByNumber = new Map()
+let stateRepository = null
 
-export function getUserState(userNumber) {
-  if (!userStateByNumber.has(userNumber)) {
-    userStateByNumber.set(userNumber, {
-      stage: STAGES.INITIAL,
-      linkSent: false,
-      optedOut: false,
-      history: [],
-      lastOutboundAt: 0,
-      lastOutboundFingerprint: ""
-    })
+function createDefaultState() {
+  return {
+    stage: STAGES.INITIAL,
+    linkSent: false,
+    optedOut: false,
+    history: [],
+    lastOutboundAt: 0,
+    lastOutboundFingerprint: ""
+  }
+}
+
+export function setStateRepository(repository) {
+  stateRepository = repository || null
+}
+
+export async function getUserState(userNumber, maxHistoryMessages) {
+  if (userStateByNumber.has(userNumber)) {
+    return userStateByNumber.get(userNumber)
   }
 
-  return userStateByNumber.get(userNumber)
+  let state = createDefaultState()
+
+  if (stateRepository) {
+    try {
+      const loadedState = await stateRepository.loadUserState(
+        userNumber,
+        maxHistoryMessages
+      )
+      if (loadedState) {
+        state = loadedState
+      }
+    } catch (error) {
+      console.error(`❌ Failed to load state for ${userNumber}:`, error.message)
+    }
+  }
+
+  userStateByNumber.set(userNumber, state)
+  return state
+}
+
+export async function persistUserState(userNumber, state) {
+  if (!stateRepository) return
+
+  try {
+    await stateRepository.saveUserState(userNumber, state)
+  } catch (error) {
+    console.error(`❌ Failed to persist state for ${userNumber}:`, error.message)
+  }
+}
+
+export async function appendHistory(userNumber, state, role, content, maxHistoryMessages) {
+  if (!content || !content.trim()) return
+
+  state.history.push({ role, content })
+
+  if (state.history.length > maxHistoryMessages) {
+    state.history.splice(0, state.history.length - maxHistoryMessages)
+  }
+
+  if (!stateRepository) return
+
+  try {
+    await stateRepository.appendHistory(
+      userNumber,
+      role,
+      content,
+      maxHistoryMessages
+    )
+  } catch (error) {
+    console.error(`❌ Failed to persist history for ${userNumber}:`, error.message)
+  }
 }
 
 export function advanceStage(state, nextStage) {
@@ -23,15 +82,5 @@ export function advanceStage(state, nextStage) {
 
   if (nextRank > currentRank) {
     state.stage = nextStage
-  }
-}
-
-export function appendHistory(state, role, content, maxHistoryMessages) {
-  if (!content || !content.trim()) return
-
-  state.history.push({ role, content })
-
-  if (state.history.length > maxHistoryMessages) {
-    state.history.splice(0, state.history.length - maxHistoryMessages)
   }
 }

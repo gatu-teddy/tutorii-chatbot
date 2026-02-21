@@ -1,7 +1,11 @@
 import { delay, normalizeText } from "../utils/index.js"
 import { STAGES } from "../constants/stages.js"
-import { appendHistory, advanceStage, getUserState } from "./stateStore.js"
-import { detectNextStage, userGaveConsent, userOptedOut } from "./stageEngine.js"
+import {
+  appendHistory,
+  advanceStage,
+  getUserState,
+  persistUserState
+} from "./stateStore.js"
 
 export function createConversationEngine({
   twilioClient,
@@ -80,6 +84,42 @@ export function createConversationEngine({
     )
   }
 
+  function isLowQualityAssistantReply(reply) {
+    const normalized = normalizeText(reply)
+    if (!normalized) return true
+
+    if (["ok", "okay", "k", "alright", "noted", "fine"].includes(normalized)) {
+      return true
+    }
+
+    const genericRoboticPatterns = [
+      /\bhow can i assist you today\b/i,
+      /\bhow may i assist you today\b/i,
+      /\bhow can i help you today\b/i
+    ]
+    if (genericRoboticPatterns.some((pattern) => pattern.test(normalized))) {
+      return true
+    }
+
+    const words = normalized.split(/\s+/).filter(Boolean)
+    return words.length === 1 && words[0].length <= 3
+  }
+
+  function buildFallbackReply(stage) {
+    switch (stage) {
+      case STAGES.INITIAL:
+        return "Hey, good to hear from you. How is your job search going these days?"
+      case STAGES.INTERESTED:
+        return "Quick one: Tutorii is a learning platform with optional referral earnings, not a job. Want a short breakdown?"
+      case STAGES.QUALIFIED:
+        return "If you want, I can send the signup link now."
+      case STAGES.LINK_SENT:
+        return "Nice, once you open it I can guide you step by step."
+      default:
+        return "Got you. What would you like to know first?"
+    }
+  }
+
   async function sendThrottledMessage({ to, body, state }) {
     if (!body || !body.trim()) return
 
@@ -120,28 +160,51 @@ export function createConversationEngine({
   }
 
   async function handleUserMessage(from, message) {
-    const state = getUserState(from)
+    const state = await getUserState(from, config.conversation.maxHistoryMessages)
 
     if (state.optedOut) {
       return
     }
 
-    appendHistory(state, "user", message, config.conversation.maxHistoryMessages)
+    await appendHistory(
+      from,
+      state,
+      "user",
+      message,
+      config.conversation.maxHistoryMessages
+    )
 
-    if (userOptedOut(message)) {
+    const messages = promptManager.buildMessages({
+      state,
+      history: state.history
+    })
+
+    const turn = await openAIClient.generateTurn(messages)
+
+    if (turn.markOptedOut) {
       state.optedOut = true
       const closeMessage =
         "Understood. I will not send more messages. If you need details later, message anytime."
 
-      appendHistory(state, "assistant", closeMessage, config.conversation.maxHistoryMessages)
+      await appendHistory(
+        from,
+        state,
+        "assistant",
+        closeMessage,
+        config.conversation.maxHistoryMessages
+      )
       await sendThrottledMessage({ to: from, body: closeMessage, state })
+      await persistUserState(from, state)
       return
     }
 
-    const nextStage = detectNextStage(state, message)
-    advanceStage(state, nextStage)
+    advanceStage(state, turn.nextStage)
+    const canSendLinkNow =
+      !state.linkSent &&
+      turn.sendLinkNow &&
+      (state.stage === STAGES.QUALIFIED || state.stage === STAGES.LINK_SENT)
 
-    if (!state.linkSent && state.stage === STAGES.QUALIFIED && userGaveConsent(message)) {
+    if (canSendLinkNow) {
       const linkMessage = `Here is the Tutorii link: ${config.links.signup}. Use sponsor: ${config.links.sponsorCode}.`
 
       await sendThrottledMessage({
@@ -152,23 +215,36 @@ export function createConversationEngine({
 
       state.linkSent = true
       advanceStage(state, STAGES.LINK_SENT)
-      appendHistory(state, "assistant", linkMessage, config.conversation.maxHistoryMessages)
+      await appendHistory(
+        from,
+        state,
+        "assistant",
+        linkMessage,
+        config.conversation.maxHistoryMessages
+      )
+      await persistUserState(from, state)
       return
     }
 
-    const messages = promptManager.buildMessages({
-      state,
-      history: state.history
-    })
+    let reply = turn.reply
+    if (isLowQualityAssistantReply(reply)) {
+      reply = buildFallbackReply(state.stage)
+    }
 
-    const reply = await openAIClient.generateReply(messages)
-    appendHistory(state, "assistant", reply, config.conversation.maxHistoryMessages)
+    await appendHistory(
+      from,
+      state,
+      "assistant",
+      reply,
+      config.conversation.maxHistoryMessages
+    )
 
     await sendThrottledMessage({
       to: from,
       body: reply,
       state
     })
+    await persistUserState(from, state)
   }
 
   async function flushBufferedMessages(from) {
