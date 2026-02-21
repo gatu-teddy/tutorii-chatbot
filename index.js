@@ -2,7 +2,7 @@ import twilio from "twilio"
 import { config } from "./src/config/index.js"
 import { createOpenAIClient } from "./src/services/openaiClient.js"
 import { createPromptManager } from "./src/services/promptManager.js"
-import { createPostgresStateRepository } from "./src/services/postgresStateRepository.js"
+import { createMongoStateRepository } from "./src/services/mongoStateRepository.js"
 import { createConversationEngine } from "./src/core/conversationEngine.js"
 import { setStateRepository } from "./src/core/stateStore.js"
 import { createServer } from "./src/http/server.js"
@@ -26,17 +26,17 @@ const promptManager = createPromptManager({
 })
 
 async function bootstrap() {
-  if (config.postgres.enabled) {
-    const stateRepository = createPostgresStateRepository({
-      postgresConfig: config.postgres,
+  if (config.mongodb.enabled) {
+    const stateRepository = createMongoStateRepository({
+      mongoConfig: config.mongodb,
       defaultMaxHistoryMessages: config.conversation.maxHistoryMessages
     })
 
     await stateRepository.init()
     setStateRepository(stateRepository)
-    console.log("🗄️ PostgreSQL chat history enabled")
+    console.log("🗄️ MongoDB chat history enabled")
   } else {
-    console.log("🧠 Using in-memory chat history (PostgreSQL disabled)")
+    console.log("🧠 Using in-memory chat history (MongoDB disabled)")
   }
 
   const conversationEngine = createConversationEngine({

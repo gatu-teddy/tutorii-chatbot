@@ -49,11 +49,8 @@ function getRequired(key, value) {
 }
 
 const openAIApiKey = process.env.OPENAI_KEY || process.env.GPT_API_KEY
-const postgresSslMode = String(process.env.PGSSLMODE || process.env.PGSSL || "")
-  .trim()
-  .toLowerCase()
-const postgresSslEnabled = ["1", "true", "yes", "require"].includes(postgresSslMode)
-const postgresEnabled = Boolean(process.env.DATABASE_URL || process.env.PGHOST)
+const mongoUri = process.env.MONGODB_URI || process.env.MONGO_URI || ""
+const mongoEnabled = Boolean(mongoUri || process.env.MONGODB_HOST)
 
 export const config = {
   port: toPositiveNumber(process.env.PORT, 3000),
@@ -100,15 +97,15 @@ export const config = {
     maxResponseDelayMs: toPositiveNumber(process.env.MAX_RESPONSE_DELAY_MS, 7000),
     maxHistoryMessages: toPositiveNumber(process.env.MAX_HISTORY_MESSAGES, 20)
   },
-  postgres: {
-    enabled: postgresEnabled,
-    connectionString: process.env.DATABASE_URL || "",
-    host: process.env.PGHOST || "",
-    port: toPositiveNumber(process.env.PGPORT, 5432),
-    user: process.env.PGUSER || "",
-    password: process.env.PGPASSWORD || "",
-    database: process.env.PGDATABASE || "",
-    ssl: postgresSslEnabled
+  mongodb: {
+    enabled: mongoEnabled,
+    uri: mongoUri,
+    host: process.env.MONGODB_HOST || "127.0.0.1",
+    port: toPositiveNumber(process.env.MONGODB_PORT, 27017),
+    user: process.env.MONGODB_USER || "",
+    password: process.env.MONGODB_PASSWORD || "",
+    database: process.env.MONGODB_DB || "tutorii_chatbot",
+    authSource: process.env.MONGODB_AUTH_SOURCE || ""
   },
   links: {
     signup: process.env.TUTORII_SIGNUP_LINK || "https://tutorii.com",
