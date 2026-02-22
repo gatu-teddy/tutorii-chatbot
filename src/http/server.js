@@ -5,6 +5,7 @@ import { normalizeNumber } from "../utils/index.js"
 export function createServer({ config, conversationEngine }) {
   const app = express()
   app.use(bodyParser.urlencoded({ extended: false }))
+  const emptyTwimlResponse = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response></Response>"
 
   app.post("/webhook", (req, res) => {
     try {
@@ -16,7 +17,9 @@ export function createServer({ config, conversationEngine }) {
         req.body.SmsSid
 
       console.log("📩 Incoming:", from, body)
-      res.sendStatus(200)
+      // Twilio webhooks should receive empty TwiML. sendStatus(200) returns body "OK",
+      // which can appear as an unwanted outbound message.
+      res.status(200).type("text/xml").send(emptyTwimlResponse)
 
       if (from === config.admin.number && body.toLowerCase() === config.admin.trigger) {
         conversationEngine.triggerTemplateCampaign().catch((error) => {

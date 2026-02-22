@@ -10,7 +10,8 @@ function createDefaultState() {
     optedOut: false,
     history: [],
     lastOutboundAt: 0,
-    lastOutboundFingerprint: ""
+    lastOutboundFingerprint: "",
+    lastOutboundContextKey: ""
   }
 }
 
@@ -39,6 +40,7 @@ export async function getUserState(userNumber, maxHistoryMessages) {
     }
   }
 
+  state.lastOutboundContextKey = String(state.lastOutboundContextKey || "")
   userStateByNumber.set(userNumber, state)
   return state
 }

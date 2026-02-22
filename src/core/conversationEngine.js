@@ -73,12 +73,14 @@ export function createConversationEngine({
     return Math.max(minDelay, Math.min(maxDelay, estimated))
   }
 
-  function isDuplicateOutbound(state, body) {
+  function isDuplicateOutbound(state, body, dedupeContextKey) {
     const normalized = normalizeText(body)
     const now = Date.now()
 
     return (
       normalized &&
+      dedupeContextKey &&
+      dedupeContextKey === state.lastOutboundContextKey &&
       normalized === state.lastOutboundFingerprint &&
       now - state.lastOutboundAt < config.conversation.outboundDuplicateWindowMs
     )
@@ -120,10 +122,10 @@ export function createConversationEngine({
     }
   }
 
-  async function sendThrottledMessage({ to, body, state }) {
+  async function sendThrottledMessage({ to, body, state, dedupeContextKey = "" }) {
     if (!body || !body.trim()) return
 
-    if (isDuplicateOutbound(state, body)) {
+    if (isDuplicateOutbound(state, body, dedupeContextKey)) {
       console.log(`♻️ Skipping duplicate outbound to ${to}`)
       return
     }
@@ -148,6 +150,7 @@ export function createConversationEngine({
 
     state.lastOutboundAt = Date.now()
     state.lastOutboundFingerprint = normalizeText(body)
+    state.lastOutboundContextKey = dedupeContextKey
   }
 
   async function sendTemplate(toNumber) {
@@ -161,6 +164,7 @@ export function createConversationEngine({
 
   async function handleUserMessage(from, message) {
     const state = await getUserState(from, config.conversation.maxHistoryMessages)
+    const outboundContextKey = normalizeText(message).slice(0, 200)
 
     if (state.optedOut) {
       return
@@ -193,7 +197,12 @@ export function createConversationEngine({
         closeMessage,
         config.conversation.maxHistoryMessages
       )
-      await sendThrottledMessage({ to: from, body: closeMessage, state })
+      await sendThrottledMessage({
+        to: from,
+        body: closeMessage,
+        state,
+        dedupeContextKey: outboundContextKey
+      })
       await persistUserState(from, state)
       return
     }
@@ -210,7 +219,8 @@ export function createConversationEngine({
       await sendThrottledMessage({
         to: from,
         body: linkMessage,
-        state
+        state,
+        dedupeContextKey: outboundContextKey
       })
 
       state.linkSent = true
@@ -242,7 +252,8 @@ export function createConversationEngine({
     await sendThrottledMessage({
       to: from,
       body: reply,
-      state
+      state,
+      dedupeContextKey: outboundContextKey
     })
     await persistUserState(from, state)
   }

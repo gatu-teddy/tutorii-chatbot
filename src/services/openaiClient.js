@@ -17,6 +17,8 @@ Return ONLY a valid JSON object with these keys:
 - send_link_now = true only when user gave clear permission to receive the signup link now.
 - If send_link_now is true, keep reply short and do not include a URL.
 - Use the current live context and chat history to decide stage naturally.
+- Reply to the latest user message first, using prior turns to maintain continuity.
+- Do not ask questions the user has already answered in recent turns.
 - Keep stage transitions realistic:
   - initial -> interested -> qualified -> link_sent
   - do not jump to link_sent unless send_link_now is true or link was already sent in context.

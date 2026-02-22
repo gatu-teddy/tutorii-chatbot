@@ -114,6 +114,33 @@ Use a different opening and wording in your next response.
 `.trim()
 }
 
+function buildRecentContextPrompt(history) {
+  const recentTurns = history
+    .slice(-8)
+    .map((item) => ({
+      role: item.role === "assistant" ? "assistant" : "user",
+      content: String(item.content || "").trim().replace(/\s+/g, " ")
+    }))
+    .filter((item) => item.content)
+
+  if (!recentTurns.length) {
+    return `
+[RECENT CONTEXT]
+No previous chat turns yet. Start naturally from the user's current message.
+`.trim()
+  }
+
+  const transcript = recentTurns
+    .map((item, index) => `${index + 1}. ${item.role}: ${item.content.slice(0, 200)}`)
+    .join("\n")
+
+  return `
+[RECENT CONTEXT]
+Use this thread context to stay coherent and avoid repeating questions the user already answered.
+${transcript}
+`.trim()
+}
+
 export function createPromptManager({ promptsDir }) {
   const knowledge = loadKnowledge(promptsDir)
   const baseSystemPrompt = buildBaseSystemPrompt(knowledge)
@@ -123,6 +150,7 @@ export function createPromptManager({ promptsDir }) {
       return [
         { role: "system", content: baseSystemPrompt },
         { role: "system", content: buildStageContextPrompt(state) },
+        { role: "system", content: buildRecentContextPrompt(history) },
         { role: "system", content: buildAntiRepetitionPrompt(history) },
         ...history
       ]
