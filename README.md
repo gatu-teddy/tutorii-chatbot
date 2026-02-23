@@ -383,7 +383,7 @@ Rules:
 ### Campaign / behavior tuning
 - `CAMPAIGN_STAGGER_MS` (default `1800`)
 - `INBOUND_DEDUPE_TTL_MS` (default `300000`)
-- `INBOUND_DEBOUNCE_MS` (default `120000`)
+- `INBOUND_DEBOUNCE_MS` (default `1 min`)
 - `OUTBOUND_COOLDOWN_MS` (default `2500`)
 - `OUTBOUND_DUPLICATE_WINDOW_MS` (default `45000`)
 - `MIN_RESPONSE_DELAY_MS` (default `1200`)

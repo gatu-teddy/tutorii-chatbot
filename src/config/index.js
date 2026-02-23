@@ -87,7 +87,7 @@ export const config = {
   },
   conversation: {
     inboundDedupeTtlMs: toPositiveNumber(process.env.INBOUND_DEDUPE_TTL_MS, 5 * 60 * 1000),
-    inboundDebounceMs: toPositiveNumber(process.env.INBOUND_DEBOUNCE_MS, 2 * 60 * 1000),
+    inboundDebounceMs: toPositiveNumber(process.env.INBOUND_DEBOUNCE_MS, 1 * 60 * 1000),
     outboundCooldownMs: toPositiveNumber(process.env.OUTBOUND_COOLDOWN_MS, 2500),
     outboundDuplicateWindowMs: toPositiveNumber(
       process.env.OUTBOUND_DUPLICATE_WINDOW_MS,
