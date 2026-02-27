@@ -318,9 +318,12 @@ export function createConversationEngine({
   }
 
   async function runTemplateCampaign() {
-    campaignStatus.totalTargets = config.targets.size
+    // Snapshot targets to avoid duplicate sends if the live Set is mutated
+    // (e.g. admin dashboard refresh syncing targets) during a running campaign.
+    const campaignTargets = [...config.targets]
+    campaignStatus.totalTargets = campaignTargets.length
 
-    for (const number of config.targets) {
+    for (const number of campaignTargets) {
       try {
         await sendTemplate(number)
         campaignStatus.sentCount += 1
