@@ -1,9 +1,4 @@
-import fs from "fs"
 import { normalizeNumber } from "../utils/index.js"
-
-function toStoredTarget(number) {
-  return `whatsapp:${number}`
-}
 
 function parseJsonTargets(rawJson) {
   const parsed = JSON.parse(rawJson)
@@ -32,75 +27,50 @@ function parseJsonTargets(rawJson) {
   return normalized
 }
 
-export function createTargetsManager({ targetsSet, targetsFile }) {
-  function listTargets() {
-    return [...targetsSet].sort((a, b) => a.localeCompare(b))
-  }
+export function createTargetsManager({ targetsSet, repository }) {
+  async function refreshTargetsSet() {
+    const targets = await repository.listTargets()
+    targetsSet.clear()
 
-  function persist() {
-    const stored = listTargets().map(toStoredTarget)
-    fs.writeFileSync(targetsFile, `${JSON.stringify(stored, null, 2)}\n`, "utf8")
-  }
-
-  function addTarget(rawTarget) {
-    const normalized = normalizeNumber(rawTarget)
-    if (!normalized) {
-      throw new Error("Target number is required")
+    for (const target of targets) {
+      targetsSet.add(target)
     }
 
-    const wasPresent = targetsSet.has(normalized)
-    targetsSet.add(normalized)
-    persist()
-
-    return {
-      target: normalized,
-      added: !wasPresent
-    }
+    return targets
   }
 
-  function deleteTarget(rawTarget) {
-    const normalized = normalizeNumber(rawTarget)
-    if (!normalized) {
-      throw new Error("Target number is required")
-    }
-
-    const existed = targetsSet.delete(normalized)
-    persist()
-
-    return {
-      target: normalized,
-      deleted: existed
-    }
+  async function listTargets() {
+    return refreshTargetsSet()
   }
 
-  function importTargetsFromJson(rawJson) {
+  async function addTarget(rawTarget) {
+    const result = await repository.addTarget(rawTarget)
+    await refreshTargetsSet()
+    return result
+  }
+
+  async function deleteTarget(rawTarget) {
+    const result = await repository.deleteTarget(rawTarget)
+    await refreshTargetsSet()
+    return result
+  }
+
+  async function importTargetsFromJson(rawJson) {
     if (!rawJson || !String(rawJson).trim()) {
       throw new Error("JSON payload is required")
     }
 
     const parsedTargets = parseJsonTargets(String(rawJson))
-    let addedCount = 0
-
-    for (const target of parsedTargets) {
-      if (!targetsSet.has(target)) {
-        targetsSet.add(target)
-        addedCount += 1
-      }
-    }
-
-    persist()
-
-    return {
-      importedCount: parsedTargets.length,
-      addedCount,
-      duplicateCount: parsedTargets.length - addedCount
-    }
+    const result = await repository.addManyTargets(parsedTargets)
+    await refreshTargetsSet()
+    return result
   }
 
   return {
     listTargets,
     addTarget,
     deleteTarget,
-    importTargetsFromJson
+    importTargetsFromJson,
+    refreshTargetsSet
   }
 }

@@ -35,6 +35,7 @@ Core behavior:
 - **Admin session manager**: `src/http/admin/sessionManager.js`
 - **Admin HTML views**: `src/http/admin/views.js`
 - **Targets persistence manager**: `src/services/targetsManager.js`
+- **Mongo targets repository**: `src/services/mongoTargetsRepository.js`
 - **Conversation orchestration**: `src/core/conversationEngine.js`
 - **State management**: `src/core/stateStore.js`
 - **AI API integration**: `src/services/openaiClient.js`
@@ -44,7 +45,7 @@ Core behavior:
 - **Config/environment**: `src/config/index.js`
 - **Utility helpers**: `src/utils/index.js`
 - **Prompt knowledge files**: `prompts/*.txt`
-- **Campaign targets list**: `targets.json`
+- **Campaign targets collection**: `campaign_targets` (MongoDB)
 
 ### Runtime components
 
@@ -63,9 +64,9 @@ Core behavior:
 4. **Conversation engine**
    - Handles per-user queueing, dedupe, debounce, throttling, fallback replies, stage advancement.
 
-5. **State store + optional Mongo repository**
+5. **State store + Mongo repository**
    - Keeps current user state in memory map.
-   - Optionally syncs state/history to MongoDB.
+   - Syncs state/history and targets with MongoDB.
 
 ---
 
@@ -78,7 +79,8 @@ Bootstraps the app:
 - Builds Twilio client from config.
 - Builds OpenAI client with model params.
 - Builds prompt manager from prompt directory.
-- Initializes Mongo repository if enabled, then injects it into `stateStore`.
+- Initializes Mongo repositories for state/history and campaign targets.
+- Hydrates runtime target set from MongoDB.
 - Creates Express server and starts listening.
 
 ### `package.json`
@@ -86,11 +88,10 @@ Bootstraps the app:
 - Start command: `npm start`.
 - Runtime dependencies: `axios`, `body-parser`, `dotenv`, `express`, `mongodb`, `twilio`.
 
-### `targets.json`
-Array of target numbers for campaign/template sending.
-- Accepts numbers with or without `whatsapp:` prefix.
-- Config loader normalizes them and converts to `Set`.
-- If malformed/missing, fallback defaults are used.
+### Campaign targets (MongoDB)
+Targets are stored in MongoDB collection `campaign_targets` (configurable via env).
+- Numbers are normalized and deduplicated.
+- Default seed targets are inserted only when the collection is empty.
 
 ### `prompts/`
 Knowledge and behavior guidance merged into system prompt:
@@ -106,15 +107,15 @@ Central config builder using `dotenv` + defaults.
 ### Key responsibilities
 - Loads `.env`.
 - Resolves required env vars with `getRequired`.
-- Loads and normalizes target numbers from `targets.json`.
+- Seeds default targets set used for first-time MongoDB bootstrap.
 - Defines all runtime tuning knobs.
-- Enables Mongo mode automatically if URI/host is present.
+- Resolves Mongo configuration used by required repositories.
 
 ### Notable fields
 - `config.port`
 - `config.promptsDir`
-- `config.targetsFile` (`targets.json` absolute path)
 - `config.targets` (`Set<string>`)
+- `config.defaultTargets` (bootstrap seed list)
 - `config.adminUi`:
   - `username` (default: `admin`)
   - `password` (default: `change-me`)
@@ -126,7 +127,7 @@ Central config builder using `dotenv` + defaults.
   - `apiKey`, `model`, `temperature`, `maxTokens`, penalties
 - `config.campaign.staggerMs`
 - `config.conversation` timing + history knobs
-- `config.mongodb` connection options
+- `config.mongodb` connection options (including `targetsCollection`)
 - `config.links.signup` + `config.links.sponsorCode`
 
 ---
@@ -268,7 +269,7 @@ Admin dashboard route handlers.
 - Authenticates with `adminUi` credentials.
 - Protects dashboard routes using session middleware.
 - Starts campaign in background and shows run status.
-- Adds/removes targets and persists changes to `targets.json`.
+- Adds/removes targets and persists changes to MongoDB.
 - Supports bulk target import from a JSON array payload.
 
 ---
@@ -289,14 +290,25 @@ HTML render helpers for login and dashboard pages.
 ---
 
 ## `src/services/targetsManager.js`
-Runtime target list management + disk persistence.
+Runtime target list management + in-memory sync with repository.
 
 ### Behavior
 - Lists current targets from live in-memory set.
 - Adds single targets with normalization.
 - Deletes single targets.
 - Imports multiple targets from JSON array text.
-- Persists all target updates to `targets.json`.
+- Syncs all target updates with MongoDB repository and runtime set.
+
+---
+
+## `src/services/mongoTargetsRepository.js`
+MongoDB persistence adapter for campaign targets.
+
+### Behavior
+- Uses collection `campaign_targets` by default.
+- Enforces unique target numbers with an index.
+- Supports list/add/delete/bulk-add operations.
+- Seeds defaults only when collection is empty.
 
 ---
 
@@ -458,6 +470,7 @@ Rules:
 - `MONGODB_PASSWORD`
 - `MONGODB_DB` (default `tutorii_chatbot`)
 - `MONGODB_AUTH_SOURCE`
+- `MONGODB_TARGETS_COLLECTION` (default `campaign_targets`)
 
 ### Link payload
 - `TUTORII_SIGNUP_LINK` (default `https://tutorii.com`)
@@ -474,7 +487,7 @@ npm install
 
 2. Create `.env` with required values.
 
-3. (Optional) Edit target recipients in `targets.json` or manage them from the admin dashboard.
+3. (Optional) Manage target recipients from the admin dashboard.
 
 4. Start server:
 ```bash
@@ -505,12 +518,12 @@ The service will:
 
 ## 9) Operational notes
 
-- Only numbers in `targets.json` (or defaults) are processed for inbound conversation.
+- Only numbers in the MongoDB targets collection are processed for inbound conversation.
 - Campaign trigger is protected behind admin login routes.
-- Target edits in admin dashboard update runtime memory and `targets.json` immediately.
+- Target edits in admin dashboard update runtime memory and MongoDB immediately.
 - The app intentionally returns empty TwiML to avoid unintended Twilio echo messages.
-- If Mongo is disabled, all state is in memory and resets on process restart.
-- With Mongo enabled, history is capped to `MAX_HISTORY_MESSAGES` per user.
+- MongoDB is required (state + campaign targets).
+- History is capped to `MAX_HISTORY_MESSAGES` per user.
 
 ---
 

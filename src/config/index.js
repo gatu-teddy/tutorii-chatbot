@@ -1,7 +1,6 @@
-import fs from "fs"
 import path from "path"
 import dotenv from "dotenv"
-import { normalizeNumber, toPositiveNumber } from "../utils/index.js"
+import { toPositiveNumber } from "../utils/index.js"
 
 dotenv.config()
 
@@ -14,31 +13,6 @@ const DEFAULT_TARGET_NUMBERS = [
 ]
 
 const PROMPTS_DIR = path.join(process.cwd(), "prompts")
-const TARGETS_FILE = path.join(process.cwd(), "targets.json")
-
-function loadTargetNumbers() {
-  if (!fs.existsSync(TARGETS_FILE)) {
-    return new Set(DEFAULT_TARGET_NUMBERS)
-  }
-
-  try {
-    const raw = fs.readFileSync(TARGETS_FILE, "utf8")
-    const parsed = JSON.parse(raw)
-
-    if (!Array.isArray(parsed)) {
-      return new Set(DEFAULT_TARGET_NUMBERS)
-    }
-
-    const numbers = parsed
-      .map(normalizeNumber)
-      .filter(Boolean)
-
-    return new Set(numbers.length ? numbers : DEFAULT_TARGET_NUMBERS)
-  } catch (error) {
-    console.error("⚠️ Could not parse targets.json, using defaults:", error.message)
-    return new Set(DEFAULT_TARGET_NUMBERS)
-  }
-}
 
 function getRequired(key, value) {
   if (!value) {
@@ -72,8 +46,8 @@ const mongoEnabled = Boolean(mongoUri || process.env.MONGODB_HOST)
 export const config = {
   port: toPositiveNumber(process.env.PORT, 3000),
   promptsDir: PROMPTS_DIR,
-  targetsFile: TARGETS_FILE,
-  targets: loadTargetNumbers(),
+  targets: new Set(DEFAULT_TARGET_NUMBERS),
+  defaultTargets: DEFAULT_TARGET_NUMBERS.slice(),
   adminUi: {
     username: process.env.ADMIN_UI_USERNAME || "admin",
     password: process.env.ADMIN_UI_PASSWORD || "change-me",
@@ -123,7 +97,8 @@ export const config = {
     user: process.env.MONGODB_USER || "",
     password: process.env.MONGODB_PASSWORD || "",
     database: process.env.MONGODB_DB || "tutorii_chatbot",
-    authSource: process.env.MONGODB_AUTH_SOURCE || ""
+    authSource: process.env.MONGODB_AUTH_SOURCE || "",
+    targetsCollection: process.env.MONGODB_TARGETS_COLLECTION || "campaign_targets"
   },
   links: {
     signup: process.env.TUTORII_SIGNUP_LINK || "https://tutorii.com",

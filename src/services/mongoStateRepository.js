@@ -14,7 +14,7 @@ function toPositiveLimit(value, fallback) {
   return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback
 }
 
-function resolveDatabaseName(mongoConfig = {}) {
+export function resolveDatabaseName(mongoConfig = {}) {
   if (mongoConfig.database) {
     return mongoConfig.database
   }
@@ -34,7 +34,7 @@ function resolveDatabaseName(mongoConfig = {}) {
   return DEFAULT_DB_NAME
 }
 
-function buildMongoUri(mongoConfig = {}) {
+export function buildMongoUri(mongoConfig = {}) {
   if (mongoConfig.uri) {
     return mongoConfig.uri
   }

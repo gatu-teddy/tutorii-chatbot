@@ -2,15 +2,10 @@ import express from "express"
 import bodyParser from "body-parser"
 import { normalizeNumber } from "../utils/index.js"
 import { createAdminRouter } from "./admin/routes.js"
-import { createTargetsManager } from "../services/targetsManager.js"
 
-export function createServer({ config, conversationEngine }) {
+export function createServer({ config, conversationEngine, targetsManager }) {
   const app = express()
   app.use(bodyParser.urlencoded({ extended: false }))
-  const targetsManager = createTargetsManager({
-    targetsSet: config.targets,
-    targetsFile: config.targetsFile
-  })
   app.use("/admin", createAdminRouter({ config, conversationEngine, targetsManager }))
 
   const emptyTwimlResponse = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response></Response>"

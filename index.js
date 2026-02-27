@@ -3,9 +3,11 @@ import { config } from "./src/config/index.js"
 import { createOpenAIClient } from "./src/services/openaiClient.js"
 import { createPromptManager } from "./src/services/promptManager.js"
 import { createMongoStateRepository } from "./src/services/mongoStateRepository.js"
+import { createMongoTargetsRepository } from "./src/services/mongoTargetsRepository.js"
 import { createConversationEngine } from "./src/core/conversationEngine.js"
 import { setStateRepository } from "./src/core/stateStore.js"
 import { createServer } from "./src/http/server.js"
+import { createTargetsManager } from "./src/services/targetsManager.js"
 
 const twilioClient = twilio(
   config.twilio.accountSid,
@@ -30,18 +32,34 @@ async function bootstrap() {
     console.warn("⚠️ ADMIN_UI_PASSWORD is using the default value. Set a strong password in .env.")
   }
 
-  if (config.mongodb.enabled) {
-    const stateRepository = createMongoStateRepository({
-      mongoConfig: config.mongodb,
-      defaultMaxHistoryMessages: config.conversation.maxHistoryMessages
-    })
-
-    await stateRepository.init()
-    setStateRepository(stateRepository)
-    console.log("🗄️ MongoDB chat history enabled")
-  } else {
-    console.log("🧠 Using in-memory chat history (MongoDB disabled)")
+  if (!config.mongodb.enabled) {
+    throw new Error(
+      "MongoDB is required because campaign targets are stored in the database. Set MONGODB_URI or MONGODB_HOST."
+    )
   }
+
+  const stateRepository = createMongoStateRepository({
+    mongoConfig: config.mongodb,
+    defaultMaxHistoryMessages: config.conversation.maxHistoryMessages
+  })
+  await stateRepository.init()
+  setStateRepository(stateRepository)
+
+  const targetsRepository = createMongoTargetsRepository({
+    mongoConfig: config.mongodb,
+    seedTargets: config.defaultTargets,
+    collectionName: config.mongodb.targetsCollection
+  })
+  await targetsRepository.init()
+
+  const targetsManager = createTargetsManager({
+    targetsSet: config.targets,
+    repository: targetsRepository
+  })
+  await targetsManager.refreshTargetsSet()
+
+  console.log("🗄️ MongoDB chat history enabled")
+  console.log("🎯 MongoDB campaign targets enabled")
 
   const conversationEngine = createConversationEngine({
     twilioClient,
@@ -52,7 +70,8 @@ async function bootstrap() {
 
   const app = createServer({
     config,
-    conversationEngine
+    conversationEngine,
+    targetsManager
   })
 
   app.listen(config.port, () => {

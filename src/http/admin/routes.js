@@ -50,16 +50,21 @@ export function createAdminRouter({ config, conversationEngine, targetsManager }
     res.redirect("/admin/login")
   })
 
-  router.get("/", sessions.requireAdmin, (req, res) => {
-    const status = conversationEngine.getCampaignStatus()
-    const targets = targetsManager.listTargets()
-    res.status(200).send(renderDashboardPage({
-      status,
-      targets,
-      targetCount: targets.length,
-      notice: readQueryValue(req.query, "notice"),
-      error: readQueryValue(req.query, "error")
-    }))
+  router.get("/", sessions.requireAdmin, async (req, res) => {
+    try {
+      const status = conversationEngine.getCampaignStatus()
+      const targets = await targetsManager.listTargets()
+      res.status(200).send(renderDashboardPage({
+        status,
+        targets,
+        targetCount: targets.length,
+        notice: readQueryValue(req.query, "notice"),
+        error: readQueryValue(req.query, "error")
+      }))
+    } catch (error) {
+      console.error("❌ Failed to load admin dashboard:", error.message)
+      redirectWithMessage(res, "error", "Could not load dashboard")
+    }
   })
 
   router.post("/campaign/trigger", sessions.requireAdmin, (req, res) => {
@@ -78,9 +83,9 @@ export function createAdminRouter({ config, conversationEngine, targetsManager }
     }
   })
 
-  router.post("/targets/add", sessions.requireAdmin, (req, res) => {
+  router.post("/targets/add", sessions.requireAdmin, async (req, res) => {
     try {
-      const result = targetsManager.addTarget(req.body.target)
+      const result = await targetsManager.addTarget(req.body.target)
       if (result.added) {
         redirectWithMessage(res, "notice", `Target added: ${result.target}`)
         return
@@ -92,9 +97,9 @@ export function createAdminRouter({ config, conversationEngine, targetsManager }
     }
   })
 
-  router.post("/targets/delete", sessions.requireAdmin, (req, res) => {
+  router.post("/targets/delete", sessions.requireAdmin, async (req, res) => {
     try {
-      const result = targetsManager.deleteTarget(req.body.target)
+      const result = await targetsManager.deleteTarget(req.body.target)
       if (result.deleted) {
         redirectWithMessage(res, "notice", `Target deleted: ${result.target}`)
         return
@@ -106,9 +111,9 @@ export function createAdminRouter({ config, conversationEngine, targetsManager }
     }
   })
 
-  router.post("/targets/import-json", sessions.requireAdmin, (req, res) => {
+  router.post("/targets/import-json", sessions.requireAdmin, async (req, res) => {
     try {
-      const result = targetsManager.importTargetsFromJson(req.body.targetsJson)
+      const result = await targetsManager.importTargetsFromJson(req.body.targetsJson)
       redirectWithMessage(
         res,
         "notice",
