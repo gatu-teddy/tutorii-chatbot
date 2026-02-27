@@ -1,5 +1,7 @@
-import { MongoClient } from "mongodb"
+import mongoose from "mongoose"
 import { STAGES } from "../constants/stages.js"
+import { getChatUserModel } from "../models/chatUserModel.js"
+import { getChatMessageModel } from "../models/chatMessageModel.js"
 
 const VALID_STAGES = new Set(Object.values(STAGES))
 const DEFAULT_HISTORY_LIMIT = 20
@@ -72,13 +74,12 @@ export function createMongoStateRepository({
   )
   const uri = buildMongoUri(mongoConfig)
   const databaseName = resolveDatabaseName(mongoConfig)
-  const client = new MongoClient(uri)
-
-  let usersCollection = null
-  let messagesCollection = null
+  let connection = null
+  let UserModel = null
+  let MessageModel = null
 
   function ensureInitialized() {
-    if (!usersCollection || !messagesCollection) {
+    if (!connection || !UserModel || !MessageModel) {
       throw new Error("Mongo repository not initialized")
     }
   }
@@ -87,7 +88,7 @@ export function createMongoStateRepository({
     ensureInitialized()
 
     const now = new Date()
-    await usersCollection.updateOne(
+    await UserModel.updateOne(
       { _id: userNumber },
       {
         $setOnInsert: {
@@ -107,15 +108,13 @@ export function createMongoStateRepository({
 
   return {
     async init() {
-      await client.connect()
-
-      const db = client.db(databaseName)
-      usersCollection = db.collection("chat_users")
-      messagesCollection = db.collection("chat_messages")
+      connection = await mongoose.createConnection(uri, { dbName: databaseName }).asPromise()
+      UserModel = getChatUserModel(connection)
+      MessageModel = getChatMessageModel(connection)
 
       await Promise.all([
-        usersCollection.createIndex({ updatedAt: -1 }),
-        messagesCollection.createIndex({ userNumber: 1, _id: -1 })
+        UserModel.init(),
+        MessageModel.init()
       ])
     },
 
@@ -130,12 +129,11 @@ export function createMongoStateRepository({
       await ensureUserRecord(userNumber)
 
       const [userDoc, historyDocs] = await Promise.all([
-        usersCollection.findOne({ _id: userNumber }),
-        messagesCollection
-          .find({ userNumber })
+        UserModel.findById(userNumber).lean(),
+        MessageModel.find({ userNumber })
           .sort({ _id: -1 })
           .limit(historyLimit)
-          .toArray()
+          .lean()
       ])
 
       const history = historyDocs
@@ -171,7 +169,7 @@ export function createMongoStateRepository({
       ensureInitialized()
 
       const now = new Date()
-      await usersCollection.updateOne(
+      await UserModel.updateOne(
         { _id: userNumber },
         {
           $set: {
@@ -202,29 +200,30 @@ export function createMongoStateRepository({
 
       await ensureUserRecord(userNumber)
 
-      await messagesCollection.insertOne({
+      await MessageModel.create({
         userNumber,
         role,
         content: content.trim(),
         createdAt: new Date()
       })
 
-      const overflowDocs = await messagesCollection
-        .find({ userNumber })
+      const overflowDocs = await MessageModel.find({ userNumber })
         .sort({ _id: -1 })
         .skip(historyLimit)
-        .project({ _id: 1 })
-        .toArray()
+        .select({ _id: 1 })
+        .lean()
 
       if (overflowDocs.length > 0) {
-        await messagesCollection.deleteMany({
+        await MessageModel.deleteMany({
           _id: { $in: overflowDocs.map((doc) => doc._id) }
         })
       }
     },
 
     async close() {
-      await client.close()
+      if (connection) {
+        await connection.close()
+      }
     }
   }
 }

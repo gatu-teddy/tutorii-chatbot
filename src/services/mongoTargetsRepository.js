@@ -1,6 +1,7 @@
-import { MongoClient } from "mongodb"
+import mongoose from "mongoose"
 import { normalizeNumber } from "../utils/index.js"
 import { buildMongoUri, resolveDatabaseName } from "./mongoStateRepository.js"
+import { getCampaignTargetModel } from "../models/campaignTargetModel.js"
 
 const DEFAULT_COLLECTION_NAME = "campaign_targets"
 
@@ -15,13 +16,13 @@ export function createMongoTargetsRepository({
 }) {
   const uri = buildMongoUri(mongoConfig)
   const databaseName = resolveDatabaseName(mongoConfig)
-  const client = new MongoClient(uri)
   const normalizedSeedTargets = normalizeTargets(seedTargets)
 
-  let targetsCollection = null
+  let connection = null
+  let TargetModel = null
 
   function ensureInitialized() {
-    if (!targetsCollection) {
+    if (!connection || !TargetModel) {
       throw new Error("Mongo targets repository not initialized")
     }
   }
@@ -33,13 +34,13 @@ export function createMongoTargetsRepository({
       return
     }
 
-    const existingCount = await targetsCollection.estimatedDocumentCount()
+    const existingCount = await TargetModel.estimatedDocumentCount()
     if (existingCount > 0) {
       return
     }
 
     const now = new Date()
-    await targetsCollection.insertMany(
+    await TargetModel.insertMany(
       normalizedSeedTargets.map((number) => ({
         number,
         createdAt: now,
@@ -51,15 +52,10 @@ export function createMongoTargetsRepository({
 
   return {
     async init() {
-      await client.connect()
+      connection = await mongoose.createConnection(uri, { dbName: databaseName }).asPromise()
+      TargetModel = getCampaignTargetModel(connection, collectionName)
 
-      const db = client.db(databaseName)
-      targetsCollection = db.collection(collectionName)
-
-      await Promise.all([
-        targetsCollection.createIndex({ number: 1 }, { unique: true }),
-        targetsCollection.createIndex({ updatedAt: -1 })
-      ])
+      await TargetModel.init()
 
       await seedDefaultsIfCollectionEmpty()
     },
@@ -67,10 +63,9 @@ export function createMongoTargetsRepository({
     async listTargets() {
       ensureInitialized()
 
-      const docs = await targetsCollection
-        .find({}, { projection: { _id: 0, number: 1 } })
+      const docs = await TargetModel.find({}, { _id: 0, number: 1 })
         .sort({ number: 1 })
-        .toArray()
+        .lean()
 
       return docs.map((doc) => doc.number).filter(Boolean)
     },
@@ -84,7 +79,7 @@ export function createMongoTargetsRepository({
       }
 
       const now = new Date()
-      const result = await targetsCollection.updateOne(
+      const result = await TargetModel.updateOne(
         { number: normalized },
         {
           $set: { updatedAt: now },
@@ -107,7 +102,7 @@ export function createMongoTargetsRepository({
         throw new Error("Target number is required")
       }
 
-      const result = await targetsCollection.deleteOne({ number: normalized })
+      const result = await TargetModel.deleteOne({ number: normalized })
 
       return {
         target: normalized,
@@ -135,7 +130,7 @@ export function createMongoTargetsRepository({
         }
       }))
 
-      const result = await targetsCollection.bulkWrite(operations, { ordered: false })
+      const result = await TargetModel.bulkWrite(operations, { ordered: false })
       const addedCount = result.upsertedCount || 0
 
       return {
@@ -146,7 +141,9 @@ export function createMongoTargetsRepository({
     },
 
     async close() {
-      await client.close()
+      if (connection) {
+        await connection.close()
+      }
     }
   }
 }

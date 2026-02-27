@@ -34,6 +34,7 @@ Core behavior:
 - **Admin HTTP routes**: `src/http/admin/routes.js`
 - **Admin session manager**: `src/http/admin/sessionManager.js`
 - **Admin HTML views**: `src/http/admin/views.js`
+- **Mongoose models**: `src/models/*.js`
 - **Targets persistence manager**: `src/services/targetsManager.js`
 - **Mongo targets repository**: `src/services/mongoTargetsRepository.js`
 - **Conversation orchestration**: `src/core/conversationEngine.js`
@@ -86,7 +87,7 @@ Bootstraps the app:
 ### `package.json`
 - ESM project (`"type": "module"`).
 - Start command: `npm start`.
-- Runtime dependencies: `axios`, `body-parser`, `dotenv`, `express`, `mongodb`, `twilio`.
+- Runtime dependencies: `axios`, `body-parser`, `dotenv`, `express`, `mongoose`, `twilio`.
 
 ### Campaign targets (MongoDB)
 Targets are stored in MongoDB collection `campaign_targets` (configurable via env).
@@ -289,6 +290,14 @@ HTML render helpers for login and dashboard pages.
 
 ---
 
+## `src/models/`
+Centralized Mongoose schema/model definitions.
+- `chatUserModel.js`
+- `chatMessageModel.js`
+- `campaignTargetModel.js`
+
+---
+
 ## `src/services/targetsManager.js`
 Runtime target list management + in-memory sync with repository.
 
@@ -363,7 +372,7 @@ MongoDB-backed persistence adapter for user state/history.
 - `chat_messages`
 
 ### Initialization
-- Connects client.
+- Connects via Mongoose.
 - Creates indexes:
   - users: `{ updatedAt: -1 }`
   - messages: `{ userNumber: 1, _id: -1 }`
