@@ -34,6 +34,7 @@ Core behavior:
 - **Admin HTTP routes**: `src/http/admin/routes.js`
 - **Admin session manager**: `src/http/admin/sessionManager.js`
 - **Admin HTML views**: `src/http/admin/views.js`
+- **Targets persistence manager**: `src/services/targetsManager.js`
 - **Conversation orchestration**: `src/core/conversationEngine.js`
 - **State management**: `src/core/stateStore.js`
 - **AI API integration**: `src/services/openaiClient.js`
@@ -112,6 +113,7 @@ Central config builder using `dotenv` + defaults.
 ### Notable fields
 - `config.port`
 - `config.promptsDir`
+- `config.targetsFile` (`targets.json` absolute path)
 - `config.targets` (`Set<string>`)
 - `config.adminUi`:
   - `username` (default: `admin`)
@@ -258,11 +260,16 @@ Admin dashboard route handlers.
 - `POST /admin/logout`
 - `GET /admin`
 - `POST /admin/campaign/trigger`
+- `POST /admin/targets/add`
+- `POST /admin/targets/delete`
+- `POST /admin/targets/import-json`
 
 ### Behavior
 - Authenticates with `adminUi` credentials.
 - Protects dashboard routes using session middleware.
 - Starts campaign in background and shows run status.
+- Adds/removes targets and persists changes to `targets.json`.
+- Supports bulk target import from a JSON array payload.
 
 ---
 
@@ -278,6 +285,18 @@ Cookie session lifecycle + credential verification.
 
 ## `src/http/admin/views.js`
 HTML render helpers for login and dashboard pages.
+
+---
+
+## `src/services/targetsManager.js`
+Runtime target list management + disk persistence.
+
+### Behavior
+- Lists current targets from live in-memory set.
+- Adds single targets with normalization.
+- Deletes single targets.
+- Imports multiple targets from JSON array text.
+- Persists all target updates to `targets.json`.
 
 ---
 
@@ -455,7 +474,7 @@ npm install
 
 2. Create `.env` with required values.
 
-3. (Optional) Edit target recipients in `targets.json`.
+3. (Optional) Edit target recipients in `targets.json` or manage them from the admin dashboard.
 
 4. Start server:
 ```bash
@@ -488,6 +507,7 @@ The service will:
 
 - Only numbers in `targets.json` (or defaults) are processed for inbound conversation.
 - Campaign trigger is protected behind admin login routes.
+- Target edits in admin dashboard update runtime memory and `targets.json` immediately.
 - The app intentionally returns empty TwiML to avoid unintended Twilio echo messages.
 - If Mongo is disabled, all state is in memory and resets on process restart.
 - With Mongo enabled, history is capped to `MAX_HISTORY_MESSAGES` per user.

@@ -6,7 +6,12 @@ function readQueryValue(query, key) {
   return typeof query?.[key] === "string" ? query[key] : ""
 }
 
-export function createAdminRouter({ config, conversationEngine }) {
+function redirectWithMessage(res, type, message) {
+  const encoded = encodeURIComponent(message)
+  res.redirect(`/admin?${type}=${encoded}`)
+}
+
+export function createAdminRouter({ config, conversationEngine, targetsManager }) {
   const router = Router()
   const sessions = createAdminSessionManager({
     sessionTtlMs: config.adminUi.sessionTtlMs,
@@ -47,9 +52,11 @@ export function createAdminRouter({ config, conversationEngine }) {
 
   router.get("/", sessions.requireAdmin, (req, res) => {
     const status = conversationEngine.getCampaignStatus()
+    const targets = targetsManager.listTargets()
     res.status(200).send(renderDashboardPage({
       status,
-      targetCount: config.targets.size,
+      targets,
+      targetCount: targets.length,
       notice: readQueryValue(req.query, "notice"),
       error: readQueryValue(req.query, "error")
     }))
@@ -60,14 +67,55 @@ export function createAdminRouter({ config, conversationEngine }) {
       const result = conversationEngine.startTemplateCampaign()
 
       if (!result.started) {
-        res.redirect("/admin?error=Campaign%20is%20already%20running")
+        redirectWithMessage(res, "error", "Campaign is already running")
         return
       }
 
-      res.redirect("/admin?notice=Campaign%20started")
+      redirectWithMessage(res, "notice", "Campaign started")
     } catch (error) {
       console.error("❌ Dashboard campaign trigger failed:", error.message)
-      res.redirect("/admin?error=Could%20not%20start%20campaign")
+      redirectWithMessage(res, "error", "Could not start campaign")
+    }
+  })
+
+  router.post("/targets/add", sessions.requireAdmin, (req, res) => {
+    try {
+      const result = targetsManager.addTarget(req.body.target)
+      if (result.added) {
+        redirectWithMessage(res, "notice", `Target added: ${result.target}`)
+        return
+      }
+
+      redirectWithMessage(res, "notice", `Target already exists: ${result.target}`)
+    } catch (error) {
+      redirectWithMessage(res, "error", error.message)
+    }
+  })
+
+  router.post("/targets/delete", sessions.requireAdmin, (req, res) => {
+    try {
+      const result = targetsManager.deleteTarget(req.body.target)
+      if (result.deleted) {
+        redirectWithMessage(res, "notice", `Target deleted: ${result.target}`)
+        return
+      }
+
+      redirectWithMessage(res, "error", `Target not found: ${result.target}`)
+    } catch (error) {
+      redirectWithMessage(res, "error", error.message)
+    }
+  })
+
+  router.post("/targets/import-json", sessions.requireAdmin, (req, res) => {
+    try {
+      const result = targetsManager.importTargetsFromJson(req.body.targetsJson)
+      redirectWithMessage(
+        res,
+        "notice",
+        `JSON imported: ${result.addedCount} added, ${result.duplicateCount} duplicates`
+      )
+    } catch (error) {
+      redirectWithMessage(res, "error", error.message)
     }
   })
 

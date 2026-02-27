@@ -72,6 +72,7 @@ const mongoEnabled = Boolean(mongoUri || process.env.MONGODB_HOST)
 export const config = {
   port: toPositiveNumber(process.env.PORT, 3000),
   promptsDir: PROMPTS_DIR,
+  targetsFile: TARGETS_FILE,
   targets: loadTargetNumbers(),
   adminUi: {
     username: process.env.ADMIN_UI_USERNAME || "admin",
