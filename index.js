@@ -26,6 +26,10 @@ const promptManager = createPromptManager({
 })
 
 async function bootstrap() {
+  if (config.adminUi.password === "change-me") {
+    console.warn("⚠️ ADMIN_UI_PASSWORD is using the default value. Set a strong password in .env.")
+  }
+
   if (config.mongodb.enabled) {
     const stateRepository = createMongoStateRepository({
       mongoConfig: config.mongodb,

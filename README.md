@@ -31,6 +31,9 @@ Core behavior:
 
 - **Entry point**: `index.js`
 - **HTTP layer**: `src/http/server.js`
+- **Admin HTTP routes**: `src/http/admin/routes.js`
+- **Admin session manager**: `src/http/admin/sessionManager.js`
+- **Admin HTML views**: `src/http/admin/views.js`
 - **Conversation orchestration**: `src/core/conversationEngine.js`
 - **State management**: `src/core/stateStore.js`
 - **AI API integration**: `src/services/openaiClient.js`
@@ -110,9 +113,11 @@ Central config builder using `dotenv` + defaults.
 - `config.port`
 - `config.promptsDir`
 - `config.targets` (`Set<string>`)
-- `config.admin`:
-  - `number` (normalized)
-  - `trigger` (default: `trigger max`)
+- `config.adminUi`:
+  - `username` (default: `admin`)
+  - `password` (default: `change-me`)
+  - `sessionTtlMs` (default: `8h`)
+  - `secureCookie` (default: `false`)
 - `config.twilio`:
   - `accountSid`, `authToken`, `from`, `templateSid`
 - `config.openai`:
@@ -215,9 +220,14 @@ The main conversation orchestration layer.
 10. Persist state.
 
 #### `triggerTemplateCampaign()`
+- Runs a full campaign send to completion.
 - Sends Twilio template to each target in `config.targets`.
 - Waits `campaign.staggerMs` between sends.
-- Logs per-recipient failures without aborting entire loop.
+- Tracks status counters and run timestamps.
+
+#### `startTemplateCampaign()`
+- Starts campaign run in the background (for dashboard UX).
+- Prevents overlapping runs if one is already active.
 
 ### Low-quality reply fallback
 AI replies are replaced when too generic (e.g., `ok`, robotic assist phrases, very short one-word content), using stage-specific fallback lines.
@@ -225,20 +235,49 @@ AI replies are replaced when too generic (e.g., `ok`, robotic assist phrases, ve
 ---
 
 ## `src/http/server.js`
-Express webhook server.
+Express HTTP server composition.
 
 ### Endpoint
 - `POST /webhook`
 
 ### Behavior
 - Uses `body-parser` urlencoded middleware.
+- Mounts admin routes from `src/http/admin/routes.js` at `/admin`.
 - Normalizes `From` number and extracts body + message SID variants.
 - Always returns **empty TwiML XML** immediately (`200`) to prevent Twilio echo side effects.
-- Admin trigger:
-  - if sender == `config.admin.number`
-  - and message equals `config.admin.trigger`
-  - starts template campaign.
 - Regular inbound processing only if sender exists in `config.targets` and body is non-empty.
+
+---
+
+## `src/http/admin/routes.js`
+Admin dashboard route handlers.
+
+### Endpoint
+- `GET /admin/login`
+- `POST /admin/login`
+- `POST /admin/logout`
+- `GET /admin`
+- `POST /admin/campaign/trigger`
+
+### Behavior
+- Authenticates with `adminUi` credentials.
+- Protects dashboard routes using session middleware.
+- Starts campaign in background and shows run status.
+
+---
+
+## `src/http/admin/sessionManager.js`
+Cookie session lifecycle + credential verification.
+
+### Behavior
+- Parses/sets/clears session cookies.
+- Supports sliding expiration with `ADMIN_UI_SESSION_TTL_MS`.
+- Uses timing-safe hashed credential comparison.
+
+---
+
+## `src/http/admin/views.js`
+HTML render helpers for login and dashboard pages.
 
 ---
 
@@ -372,9 +411,11 @@ Rules:
 - `OPENAI_FREQUENCY_PENALTY` (default `0.3`)
 - `OPENAI_PRESENCE_PENALTY` (default `0.15`)
 
-### Admin controls
-- `ADMIN_NUMBER` (default `+971567728465`, normalized)
-- `ADMIN_TRIGGER` (default `trigger max`)
+### Admin UI controls
+- `ADMIN_UI_USERNAME` (default `admin`)
+- `ADMIN_UI_PASSWORD` (default `change-me`)
+- `ADMIN_UI_SESSION_TTL_MS` (default `28800000`)
+- `ADMIN_UI_SECURE_COOKIE` (default `false`)
 
 ### Twilio defaults
 - `TWILIO_WHATSAPP_FROM` (default `whatsapp:+971504095079`)
@@ -424,13 +465,17 @@ npm start
 5. Configure Twilio WhatsApp webhook URL to:
 - `POST https://<your-domain>/webhook`
 
+6. Open admin dashboard:
+- `GET http://localhost:<PORT>/admin/login`
+- Login with `ADMIN_UI_USERNAME` / `ADMIN_UI_PASSWORD`.
+
 ---
 
 ## 8) Campaign trigger behavior
 
 To trigger outbound template campaign:
-- send a WhatsApp message from `ADMIN_NUMBER`
-- with exact text equal to `ADMIN_TRIGGER` (default `trigger max`)
+- login to the admin dashboard
+- click `Trigger Campaign`
 
 The service will:
 - iterate through all target numbers,
@@ -442,6 +487,7 @@ The service will:
 ## 9) Operational notes
 
 - Only numbers in `targets.json` (or defaults) are processed for inbound conversation.
+- Campaign trigger is protected behind admin login routes.
 - The app intentionally returns empty TwiML to avoid unintended Twilio echo messages.
 - If Mongo is disabled, all state is in memory and resets on process restart.
 - With Mongo enabled, history is capped to `MAX_HISTORY_MESSAGES` per user.
@@ -452,6 +498,7 @@ The service will:
 
 - Keep `.env` out of version control.
 - Rotate API keys/tokens immediately if they are ever exposed.
+- Set a strong `ADMIN_UI_PASSWORD` and enable `ADMIN_UI_SECURE_COOKIE=true` behind HTTPS.
 - Restrict webhook endpoint to trusted Twilio traffic where possible.
 
 ---

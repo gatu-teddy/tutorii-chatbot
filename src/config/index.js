@@ -48,6 +48,23 @@ function getRequired(key, value) {
   return value
 }
 
+function toBoolean(value, fallback = false) {
+  if (value === undefined || value === null || value === "") {
+    return fallback
+  }
+
+  const normalized = String(value).trim().toLowerCase()
+  if (["1", "true", "yes", "on"].includes(normalized)) {
+    return true
+  }
+
+  if (["0", "false", "no", "off"].includes(normalized)) {
+    return false
+  }
+
+  return fallback
+}
+
 const openAIApiKey = process.env.OPENAI_KEY || process.env.GPT_API_KEY
 const mongoUri = process.env.MONGODB_URI || process.env.MONGO_URI || ""
 const mongoEnabled = Boolean(mongoUri || process.env.MONGODB_HOST)
@@ -56,11 +73,11 @@ export const config = {
   port: toPositiveNumber(process.env.PORT, 3000),
   promptsDir: PROMPTS_DIR,
   targets: loadTargetNumbers(),
-  admin: {
-    number: normalizeNumber(process.env.ADMIN_NUMBER || "+971567728465"),
-    trigger: String(process.env.ADMIN_TRIGGER || "trigger max")
-      .trim()
-      .toLowerCase()
+  adminUi: {
+    username: process.env.ADMIN_UI_USERNAME || "admin",
+    password: process.env.ADMIN_UI_PASSWORD || "change-me",
+    sessionTtlMs: toPositiveNumber(process.env.ADMIN_UI_SESSION_TTL_MS, 8 * 60 * 60 * 1000),
+    secureCookie: toBoolean(process.env.ADMIN_UI_SECURE_COOKIE, false)
   },
   twilio: {
     accountSid: getRequired("TWILIO_ACCOUNT_SID", process.env.TWILIO_ACCOUNT_SID),

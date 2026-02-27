@@ -16,6 +16,15 @@ export function createConversationEngine({
   const userQueues = new Map()
   const processedInbound = new Map()
   const pendingInbound = new Map()
+  const campaignStatus = {
+    isRunning: false,
+    startedAt: 0,
+    finishedAt: 0,
+    sentCount: 0,
+    failedCount: 0,
+    totalTargets: config.targets.size,
+    lastError: ""
+  }
 
   function getInboundFingerprint({ messageSid, from, body }) {
     const normalizedBody = normalizeText(body).slice(0, 200)
@@ -308,19 +317,100 @@ export function createConversationEngine({
     bufferInboundMessage(from, body)
   }
 
-  async function triggerTemplateCampaign() {
+  async function runTemplateCampaign() {
+    campaignStatus.totalTargets = config.targets.size
+
     for (const number of config.targets) {
       try {
         await sendTemplate(number)
+        campaignStatus.sentCount += 1
         await delay(config.campaign.staggerMs)
       } catch (error) {
+        campaignStatus.failedCount += 1
+        campaignStatus.lastError = error.message
         console.error(`❌ Failed to send template to ${number}:`, error.message)
       }
     }
   }
 
+  function beginCampaignRun() {
+    if (campaignStatus.isRunning) {
+      return false
+    }
+
+    campaignStatus.isRunning = true
+    campaignStatus.startedAt = Date.now()
+    campaignStatus.finishedAt = 0
+    campaignStatus.sentCount = 0
+    campaignStatus.failedCount = 0
+    campaignStatus.lastError = ""
+
+    return true
+  }
+
+  function endCampaignRun() {
+    campaignStatus.isRunning = false
+    campaignStatus.finishedAt = Date.now()
+  }
+
+  function handleCampaignRunFailure(error) {
+    campaignStatus.lastError = error.message
+    console.error("❌ Campaign run failed:", error.message)
+  }
+
+  async function triggerTemplateCampaign() {
+    if (!beginCampaignRun()) {
+      return {
+        started: false,
+        reason: "already_running",
+        status: getCampaignStatus()
+      }
+    }
+
+    try {
+      await runTemplateCampaign()
+    } catch (error) {
+      handleCampaignRunFailure(error)
+    } finally {
+      endCampaignRun()
+    }
+
+    return {
+      started: true,
+      status: getCampaignStatus()
+    }
+  }
+
+  function startTemplateCampaign() {
+    if (!beginCampaignRun()) {
+      return {
+        started: false,
+        reason: "already_running",
+        status: getCampaignStatus()
+      }
+    }
+
+    runTemplateCampaign()
+      .catch(handleCampaignRunFailure)
+      .finally(endCampaignRun)
+
+    return {
+      started: true,
+      status: getCampaignStatus()
+    }
+  }
+
+  function getCampaignStatus() {
+    return {
+      ...campaignStatus,
+      totalTargets: config.targets.size
+    }
+  }
+
   return {
     processInbound,
-    triggerTemplateCampaign
+    triggerTemplateCampaign,
+    startTemplateCampaign,
+    getCampaignStatus
   }
 }
