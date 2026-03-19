@@ -10,7 +10,11 @@ const STAGE_DIRECTIVES = {
   [STAGES.QUALIFIED]:
     "Use a soft close in plain language: ask permission to share the signup link unless the user already asked for it.",
   [STAGES.LINK_SENT]:
-    "Stay helpful and conversational for onboarding, and avoid restarting the full pitch."
+    "Stay helpful and conversational for onboarding, and avoid restarting the full pitch.",
+  [STAGES.STALLED]:
+    "Re-engage naturally. Reference something from the earlier conversation if possible. Keep it short and low-pressure.",
+  [STAGES.WIN_BACK]:
+    "This user went cold a while ago. Re-open the conversation warmly, don't reference the gap, and give them one clear reason to take another look."
 }
 
 function safeRead(filePath) {
@@ -35,7 +39,11 @@ function loadKnowledge(promptsDir) {
     .join("\n\n")
 }
 
-function buildBaseSystemPrompt(knowledge) {
+function buildBaseSystemPrompt(knowledge, productKnowledge) {
+  const knowledgeSection = productKnowledge
+    ? `[PRODUCT KNOWLEDGE — USE THESE FACTS, DO NOT DEVIATE]\n${productKnowledge}`
+    : `[KNOWLEDGE]\n${knowledge}`
+
   return `
 [ROLE]
 You are Tutorii's experienced WhatsApp consultant.
@@ -69,13 +77,15 @@ Guide job seekers in UAE/GCC from curiosity to informed signup while staying com
 - Ask at most one question.
 - No markdown, no bullets, no decorative formatting.
 
-[KNOWLEDGE]
-${knowledge}
+${knowledgeSection}
 `.trim()
 }
 
-function buildStageContextPrompt(state) {
+function buildStageContextPrompt(state, socialProof) {
   const stageDirective = STAGE_DIRECTIVES[state.stage] || STAGE_DIRECTIVES[STAGES.INITIAL]
+  const socialProofLine = socialProof
+    ? `\n[SOCIAL PROOF — weave this in naturally if it fits the conversation]\n${socialProof}`
+    : ""
 
   return `
 [LIVE CONTEXT]
@@ -84,7 +94,16 @@ Link sent: ${state.linkSent ? "yes" : "no"}
 User opted out: ${state.optedOut ? "yes" : "no"}
 
 [ACTIVE DIRECTION]
-${stageDirective}
+${stageDirective}${socialProofLine}
+`.trim()
+}
+
+function buildObjectionPrompt(objectionPrompt) {
+  if (!objectionPrompt) return null
+
+  return `
+[OBJECTION DETECTED — handle this before anything else]
+${objectionPrompt}
 `.trim()
 }
 
@@ -143,17 +162,24 @@ ${transcript}
 
 export function createPromptManager({ promptsDir }) {
   const knowledge = loadKnowledge(promptsDir)
-  const baseSystemPrompt = buildBaseSystemPrompt(knowledge)
 
   return {
-    buildMessages({ state, history }) {
-      return [
+    buildMessages({ state, history, objectionPrompt = null, socialProof = "", productKnowledge = "" }) {
+      const baseSystemPrompt = buildBaseSystemPrompt(knowledge, productKnowledge)
+      const objectionBlock = buildObjectionPrompt(objectionPrompt)
+
+      const systemMessages = [
         { role: "system", content: baseSystemPrompt },
-        { role: "system", content: buildStageContextPrompt(state) },
+        { role: "system", content: buildStageContextPrompt(state, socialProof) },
         { role: "system", content: buildRecentContextPrompt(history) },
-        { role: "system", content: buildAntiRepetitionPrompt(history) },
-        ...history
+        { role: "system", content: buildAntiRepetitionPrompt(history) }
       ]
+
+      if (objectionBlock) {
+        systemMessages.push({ role: "system", content: objectionBlock })
+      }
+
+      return [...systemMessages, ...history]
     }
   }
 }

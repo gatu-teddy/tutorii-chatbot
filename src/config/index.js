@@ -58,7 +58,10 @@ export const config = {
     accountSid: getRequired("TWILIO_ACCOUNT_SID", process.env.TWILIO_ACCOUNT_SID),
     authToken: getRequired("TWILIO_AUTH_TOKEN", process.env.TWILIO_AUTH_TOKEN),
     from: process.env.TWILIO_WHATSAPP_FROM || "whatsapp:+971504095079",
-    templateSid: process.env.TWILIO_TEMPLATE_SID || "HXfb26e732c302470271e7b20a3aee5032"
+    templateSid: process.env.TWILIO_TEMPLATE_SID || "HXfb26e732c302470271e7b20a3aee5032",
+    // Win-back re-engagement template — must be a pre-approved WhatsApp template in Twilio.
+    // Set TWILIO_WIN_BACK_TEMPLATE_SID in your environment when you have one ready.
+    winBackTemplateSid: process.env.TWILIO_WIN_BACK_TEMPLATE_SID || ""
   },
   openai: {
     apiKey: getRequired("OPENAI_KEY or GPT_API_KEY", openAIApiKey),
@@ -87,7 +90,10 @@ export const config = {
     ),
     minResponseDelayMs: toPositiveNumber(process.env.MIN_RESPONSE_DELAY_MS, 1200),
     maxResponseDelayMs: toPositiveNumber(process.env.MAX_RESPONSE_DELAY_MS, 7000),
-    maxHistoryMessages: toPositiveNumber(process.env.MAX_HISTORY_MESSAGES, 20)
+    maxHistoryMessages: toPositiveNumber(process.env.MAX_HISTORY_MESSAGES, 20),
+    // Re-engagement delays
+    stalledDelayMs: toPositiveNumber(process.env.STALLED_DELAY_MS, 3 * 24 * 60 * 60 * 1000),   // 3 days
+    winBackDelayMs: toPositiveNumber(process.env.WIN_BACK_DELAY_MS, 30 * 24 * 60 * 60 * 1000)  // 30 days
   },
   mongodb: {
     enabled: mongoEnabled,

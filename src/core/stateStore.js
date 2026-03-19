@@ -11,7 +11,18 @@ function createDefaultState() {
     history: [],
     lastOutboundAt: 0,
     lastOutboundFingerprint: "",
-    lastOutboundContextKey: ""
+    lastOutboundContextKey: "",
+    // Re-engagement tracking
+    stalledSent: false,
+    winBackSent: false,
+    optedOutAt: 0,
+    // Campaign tracking
+    campaignCount: 0,
+    lastCampaignAt: 0,
+    lastCampaignStage: "",
+    // Follow-up tracking
+    followUpCount: 0,
+    lastInboundAt: 0
   }
 }
 
@@ -33,7 +44,8 @@ export async function getUserState(userNumber, maxHistoryMessages) {
         maxHistoryMessages
       )
       if (loadedState) {
-        state = loadedState
+        // Merge loaded state with defaults so new fields are always present
+        state = { ...createDefaultState(), ...loadedState }
       }
     } catch (error) {
       console.error(`❌ Failed to load state for ${userNumber}:`, error.message)
