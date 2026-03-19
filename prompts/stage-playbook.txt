@@ -5,6 +5,7 @@ Allowed actions:
 - Show brief empathy.
 - Keep the tone human and warm, not formal or scripted.
 - Ask one short qualifying question.
+- Mention briefly that members have the option to earn from referrals if relevant to context.
 - Keep it conversational and calm.
 Do not:
 - Send link.
