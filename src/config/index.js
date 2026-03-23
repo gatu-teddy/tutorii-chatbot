@@ -58,7 +58,7 @@ export const config = {
     accountSid: getRequired("TWILIO_ACCOUNT_SID", process.env.TWILIO_ACCOUNT_SID),
     authToken: getRequired("TWILIO_AUTH_TOKEN", process.env.TWILIO_AUTH_TOKEN),
     from: process.env.TWILIO_WHATSAPP_FROM || "whatsapp:+971504095079",
-    templateSid: process.env.TWILIO_TEMPLATE_SID || "HXfb26e732c302470271e7b20a3aee5032",
+    templateSid: process.env.TWILIO_TEMPLATE_SID || "HX77c245dfbe464ef9f475cc9963735854",
     // Win-back re-engagement template — must be a pre-approved WhatsApp template in Twilio.
     // Set TWILIO_WIN_BACK_TEMPLATE_SID in your environment when you have one ready.
     winBackTemplateSid: process.env.TWILIO_WIN_BACK_TEMPLATE_SID || ""
