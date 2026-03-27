@@ -108,6 +108,6 @@ export const config = {
   },
   links: {
     signup: process.env.TUTORII_SIGNUP_LINK || "https://tutorii.com",
-    sponsorCode: process.env.TUTORII_SPONSOR_CODE || "TTRI-business-admin"
+    //sponsorCode: process.env.TUTORII_SPONSOR_CODE || "TTRI-business-admin"
   }
 }
