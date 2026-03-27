@@ -93,7 +93,7 @@ export const config = {
     maxHistoryMessages: toPositiveNumber(process.env.MAX_HISTORY_MESSAGES, 20),
     // Re-engagement delays
     stalledDelayMs: toPositiveNumber(process.env.STALLED_DELAY_MS, 3 * 24 * 60 * 60 * 1000),   // 3 days
-    winBackDelayMs: toPositiveNumber(process.env.WIN_BACK_DELAY_MS, 30 * 24 * 60 * 60 * 1000)  // 30 days
+    winBackDelayMs: toPositiveNumber(process.env.WIN_BACK_DELAY_MS, 21* 24 * 60 * 60 * 1000)  // 21 days
   },
   mongodb: {
     enabled: mongoEnabled,
