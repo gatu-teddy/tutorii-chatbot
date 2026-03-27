@@ -1079,7 +1079,7 @@ export function createConversationEngine({
 
     if (canSendLinkNow) {
       const linkMessage =
-        `Here you go 👇\n${config.links.signup}\n\nUse code ${config.links.sponsorCode} when you sign up — that connects you to my team so I can help you get started.`
+        `Here you go 👇\n${config.links.signup}\n\nLet me know when you do, so I can help you get started.`
 
       await sendThrottledMessage({
         to: from,
