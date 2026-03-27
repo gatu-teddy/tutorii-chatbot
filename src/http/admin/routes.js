@@ -69,17 +69,35 @@ export function createAdminRouter({ config, conversationEngine, targetsManager }
 
   router.post("/campaign/trigger", sessions.requireAdmin, (req, res) => {
     try {
-      const result = conversationEngine.startTemplateCampaign()
+      const skipDuplicates = req.body.skipDuplicates === "1"
+      const result = conversationEngine.startTemplateCampaign({ skipDuplicates })
 
       if (!result.started) {
         redirectWithMessage(res, "error", "Campaign is already running")
         return
       }
 
-      redirectWithMessage(res, "notice", "Campaign started")
+      const msg = skipDuplicates ? "Campaign started (skipping duplicates)" : "Campaign started"
+      redirectWithMessage(res, "notice", msg)
     } catch (error) {
       console.error("❌ Dashboard campaign trigger failed:", error.message)
       redirectWithMessage(res, "error", "Could not start campaign")
+    }
+  })
+
+  router.post("/campaign/cancel", sessions.requireAdmin, (req, res) => {
+    try {
+      const result = conversationEngine.cancelCampaign()
+
+      if (!result.cancelled) {
+        redirectWithMessage(res, "error", "No campaign is currently running")
+        return
+      }
+
+      redirectWithMessage(res, "notice", "Campaign cancellation requested — will stop after current message")
+    } catch (error) {
+      console.error("❌ Dashboard campaign cancel failed:", error.message)
+      redirectWithMessage(res, "error", "Could not cancel campaign")
     }
   })
 

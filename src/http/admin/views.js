@@ -163,11 +163,21 @@ export function renderDashboardPage({
           <p style="margin:0; font-size:13px;"><strong>Last Error:</strong> ${escapeHtml(status?.lastError || "None")}</p>
         </div>
 
-        <form method="post" action="/admin/campaign/trigger" style="margin-top:16px;">
+        <form method="post" action="/admin/campaign/trigger" style="margin-top:16px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
           <button type="submit" ${isRunning ? "disabled" : ""} style="border:0; border-radius:8px; background:${isRunning ? "#9ca3af" : "#0f766e"}; color:#fff; padding:11px 14px; font-size:14px; cursor:${isRunning ? "not-allowed" : "pointer"};">
             ${isRunning ? "Campaign Running..." : "Trigger Campaign"}
           </button>
+          <label style="display:flex; align-items:center; gap:6px; font-size:13px; color:#374151; cursor:pointer;">
+            <input type="checkbox" name="skipDuplicates" value="1" ${isRunning ? "disabled" : ""} style="width:15px; height:15px; cursor:pointer;" />
+            Skip already-contacted numbers
+          </label>
         </form>
+        ${isRunning ? `
+        <form method="post" action="/admin/campaign/cancel" style="margin-top:10px;">
+          <button type="submit" style="border:1px solid #dc2626; border-radius:8px; background:#fff; color:#dc2626; padding:9px 14px; font-size:13px; cursor:pointer;">
+            Cancel Campaign
+          </button>
+        </form>` : ""}
 
         <hr style="margin:24px 0; border:0; border-top:1px solid #e5e7eb;" />
 

@@ -578,6 +578,7 @@ export function createConversationEngine({
 
   const campaignStatus = {
     isRunning: false,
+    cancelRequested: false,
     startedAt: 0,
     finishedAt: 0,
     sentCount: 0,
@@ -1187,17 +1188,28 @@ export function createConversationEngine({
   // 5. Template campaign with history tracking & segmentation
   // -------------------------------------------------------------------------
 
-  async function runTemplateCampaign() {
+  async function runTemplateCampaign({ skipDuplicates = false } = {}) {
     const campaignTargets = [...config.targets]
     campaignStatus.totalTargets = campaignTargets.length
 
     for (const number of campaignTargets) {
+      if (campaignStatus.cancelRequested) {
+        console.log("🛑 Campaign cancelled by admin")
+        break
+      }
+
       try {
         const state = await getUserState(number, config.conversation.maxHistoryMessages)
 
         // Skip opted-out users (win-back is handled by its own timer)
         if (state.optedOut) {
           console.log(`⏭️ Skipping opted-out user ${number}`)
+          continue
+        }
+
+        // Skip already-contacted users when skipDuplicates is on
+        if (skipDuplicates && (state.campaignCount || 0) > 0) {
+          console.log(`⏭️ Skipping duplicate ${number} (already contacted ${state.campaignCount} time(s))`)
           continue
         }
 
@@ -1236,6 +1248,7 @@ export function createConversationEngine({
     }
 
     campaignStatus.isRunning = true
+    campaignStatus.cancelRequested = false
     campaignStatus.startedAt = Date.now()
     campaignStatus.finishedAt = 0
     campaignStatus.sentCount = 0
@@ -1255,7 +1268,7 @@ export function createConversationEngine({
     console.error("❌ Campaign run failed:", error.message)
   }
 
-  async function triggerTemplateCampaign() {
+  async function triggerTemplateCampaign({ skipDuplicates = false } = {}) {
     if (!beginCampaignRun()) {
       return {
         started: false,
@@ -1265,7 +1278,7 @@ export function createConversationEngine({
     }
 
     try {
-      await runTemplateCampaign()
+      await runTemplateCampaign({ skipDuplicates })
     } catch (error) {
       handleCampaignRunFailure(error)
     } finally {
@@ -1278,7 +1291,7 @@ export function createConversationEngine({
     }
   }
 
-  function startTemplateCampaign() {
+  function startTemplateCampaign({ skipDuplicates = false } = {}) {
     if (!beginCampaignRun()) {
       return {
         started: false,
@@ -1287,7 +1300,7 @@ export function createConversationEngine({
       }
     }
 
-    runTemplateCampaign()
+    runTemplateCampaign({ skipDuplicates })
       .catch(handleCampaignRunFailure)
       .finally(() => endCampaignRun())
 
@@ -1295,6 +1308,15 @@ export function createConversationEngine({
       started: true,
       status: getCampaignStatus()
     }
+  }
+
+  function cancelCampaign() {
+    if (!campaignStatus.isRunning) {
+      return { cancelled: false, reason: "not_running" }
+    }
+    campaignStatus.cancelRequested = true
+    console.log("🛑 Campaign cancel requested by admin")
+    return { cancelled: true }
   }
 
   function getCampaignStatus() {
@@ -1308,6 +1330,7 @@ export function createConversationEngine({
     processInbound,
     triggerTemplateCampaign,
     startTemplateCampaign,
+    cancelCampaign,
     getCampaignStatus
   }
 }
