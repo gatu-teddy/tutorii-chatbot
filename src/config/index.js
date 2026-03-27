@@ -61,7 +61,7 @@ export const config = {
     templateSid: process.env.TWILIO_TEMPLATE_SID || "HX77c245dfbe464ef9f475cc9963735854",
     // Win-back re-engagement template — must be a pre-approved WhatsApp template in Twilio.
     // Set TWILIO_WIN_BACK_TEMPLATE_SID in your environment when you have one ready.
-    winBackTemplateSid: process.env.TWILIO_WIN_BACK_TEMPLATE_SID || ""
+    winBackTemplateSid: process.env.TWILIO_WIN_BACK_TEMPLATE_SID || "HX6b309b4d3282ef4af75349e7c2836c8b"
   },
   openai: {
     apiKey: getRequired("OPENAI_KEY or GPT_API_KEY", openAIApiKey),
