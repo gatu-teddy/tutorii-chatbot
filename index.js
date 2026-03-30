@@ -67,6 +67,7 @@ async function bootstrap() {
     promptManager,
     config
   })
+  global.__conversationEngine = conversationEngine
 
   const app = createServer({
     config,
@@ -83,4 +84,10 @@ async function bootstrap() {
 bootstrap().catch((error) => {
   console.error("❌ Failed to start app:", error.message)
   process.exit(1)
+})
+
+process.on("SIGTERM", () => {
+  if (global.__conversationEngine) {
+    global.__conversationEngine.destroy()
+  }
 })

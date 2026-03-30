@@ -85,18 +85,34 @@ export function createOpenAIClient({
   presencePenalty = 0
 }) {
   async function requestChatCompletion(body) {
-    const response = await axios.post(
-      OPENAI_ENDPOINT,
-      body,
-      {
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json"
-        }
-      }
-    )
+    const MAX_RETRIES = 3
+    let lastError
 
-    return response.data?.choices?.[0]?.message?.content?.trim()
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        const response = await axios.post(
+          OPENAI_ENDPOINT,
+          body,
+          {
+            headers: {
+              Authorization: `Bearer ${apiKey}`,
+              "Content-Type": "application/json"
+            },
+            timeout: 30000
+          }
+        )
+        return response.data?.choices?.[0]?.message?.content?.trim()
+      } catch (err) {
+        lastError = err
+        const status = err.response?.status
+        const isRetryable = status === 429 || (status >= 500 && status < 600) || err.code === "ECONNABORTED"
+        if (!isRetryable || attempt === MAX_RETRIES) throw err
+        const backoffMs = Math.min(1000 * 2 ** attempt, 16000)
+        await new Promise((resolve) => setTimeout(resolve, backoffMs))
+      }
+    }
+
+    throw lastError
   }
 
   return {

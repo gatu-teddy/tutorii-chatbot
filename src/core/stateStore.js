@@ -1,6 +1,7 @@
 import { STAGES, STAGE_RANK } from "../constants/stages.js"
 
 const userStateByNumber = new Map()
+const STATE_CACHE_MAX = 500
 let stateRepository = null
 
 function createDefaultState() {
@@ -53,6 +54,12 @@ export async function getUserState(userNumber, maxHistoryMessages) {
   }
 
   state.lastOutboundContextKey = String(state.lastOutboundContextKey || "")
+
+  if (userStateByNumber.size >= STATE_CACHE_MAX) {
+    const oldestKey = userStateByNumber.keys().next().value
+    userStateByNumber.delete(oldestKey)
+  }
+
   userStateByNumber.set(userNumber, state)
   return state
 }

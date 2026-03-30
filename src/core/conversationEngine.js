@@ -602,20 +602,22 @@ export function createConversationEngine({
     return `fallback:${from}:${normalizedBody}:${timeBucket}`
   }
 
-  function isDuplicateInbound(fingerprint) {
+  // Purge expired dedupe entries on a fixed interval instead of on every inbound call.
+  const dedupeCleanupInterval = setInterval(() => {
     const now = Date.now()
-
     for (const [key, createdAt] of processedInbound.entries()) {
       if (now - createdAt > config.conversation.inboundDedupeTtlMs) {
         processedInbound.delete(key)
       }
     }
+  }, 60000)
 
+  function isDuplicateInbound(fingerprint) {
     if (processedInbound.has(fingerprint)) {
       return true
     }
 
-    processedInbound.set(fingerprint, now)
+    processedInbound.set(fingerprint, Date.now())
     return false
   }
 
@@ -623,10 +625,19 @@ export function createConversationEngine({
   // Per-user sequential task queue
   // -------------------------------------------------------------------------
 
+  function withTaskTimeout(taskFn, ms, label) {
+    return Promise.race([
+      taskFn(),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error(`Task timed out after ${ms}ms: ${label}`)), ms)
+      )
+    ])
+  }
+
   function enqueueUserTask(userNumber, task) {
     const previous = userQueues.get(userNumber) || Promise.resolve()
     const next = previous
-      .then(task)
+      .then(() => withTaskTimeout(task, 60000, userNumber))
       .catch((error) => {
         console.error(`❌ User task failed for ${userNumber}:`, error.message)
       })
@@ -765,13 +776,36 @@ export function createConversationEngine({
     state.lastOutboundContextKey = dedupeContextKey
   }
 
+  async function withTwilioRetry(fn) {
+    const MAX_RETRIES = 3
+    let lastError
+
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        return await fn()
+      } catch (err) {
+        lastError = err
+        // Twilio rate limit is status 429 or Twilio error code 20429
+        // Transient server errors are 500/503
+        const httpStatus = err.status
+        const twilioCode = err.code
+        const isRetryable = httpStatus === 429 || httpStatus === 500 || httpStatus === 503 || twilioCode === 20429
+        if (!isRetryable || attempt === MAX_RETRIES) throw err
+        const backoffMs = Math.min(1000 * 2 ** attempt, 16000)
+        await delay(backoffMs)
+      }
+    }
+
+    throw lastError
+  }
+
   async function sendTemplate(toNumber) {
-    return twilioClient.messages.create({
+    return withTwilioRetry(() => twilioClient.messages.create({
       from: config.twilio.from,
       to: `whatsapp:${toNumber}`,
       contentSid: config.twilio.templateSid,
       contentVariables: JSON.stringify({ 1: "there" })
-    })
+    }))
   }
 
   // -------------------------------------------------------------------------
@@ -781,12 +815,12 @@ export function createConversationEngine({
   // -------------------------------------------------------------------------
 
   async function sendWinBackTemplate(toNumber) {
-    return twilioClient.messages.create({
+    return withTwilioRetry(() => twilioClient.messages.create({
       from: config.twilio.from,
       to: `whatsapp:${toNumber}`,
       contentSid: config.twilio.winBackTemplateSid,
       contentVariables: JSON.stringify({ 1: "there" })
-    })
+    }))
   }
 
   // -------------------------------------------------------------------------
@@ -1192,52 +1226,77 @@ export function createConversationEngine({
     const campaignTargets = [...config.targets]
     campaignStatus.totalTargets = campaignTargets.length
 
-    for (const number of campaignTargets) {
+    const BATCH_SIZE = config.campaign.batchSize || 10
+
+    for (let i = 0; i < campaignTargets.length; i += BATCH_SIZE) {
       if (campaignStatus.cancelRequested) {
         console.log("🛑 Campaign cancelled by admin")
         break
       }
 
-      try {
-        const state = await getUserState(number, config.conversation.maxHistoryMessages)
+      const batch = campaignTargets.slice(i, i + BATCH_SIZE)
 
-        // Skip opted-out users (win-back is handled by its own timer)
-        if (state.optedOut) {
-          console.log(`⏭️ Skipping opted-out user ${number}`)
-          continue
+      await Promise.all(batch.map(async (number) => {
+        try {
+          const state = await getUserState(number, config.conversation.maxHistoryMessages)
+
+          // Skip opted-out users (win-back is handled by its own timer)
+          if (state.optedOut) {
+            console.log(`⏭️ Skipping opted-out user ${number}`)
+            return
+          }
+
+          // Skip already-contacted users when skipDuplicates is on
+          if (skipDuplicates && (state.campaignCount || 0) > 0) {
+            console.log(`⏭️ Skipping duplicate ${number} (already contacted ${state.campaignCount} time(s))`)
+            return
+          }
+
+          // Track campaign touches
+          const campaignCount = (state.campaignCount || 0) + 1
+          const previousStage = state.stage || STAGES.INITIAL
+
+          if (campaignCount > 1 && previousStage !== STAGES.INITIAL) {
+            console.log(`🔁 Re-contacting ${number} (touch #${campaignCount}, prev stage: ${previousStage})`)
+          }
+
+          await sendTemplate(number)
+
+          state.campaignCount = campaignCount
+          state.lastCampaignAt = Date.now()
+          state.lastCampaignStage = previousStage
+          await persistUserState(number, state)
+
+          campaignStatus.sentCount += 1
+
+          // Time-aware follow-up
+          scheduleFollowUp(number)
+        } catch (error) {
+          campaignStatus.failedCount += 1
+          campaignStatus.lastError = error.message
+
+          const httpStatus = error.status || error.response?.status
+          const twilioCode = error.code
+
+          // Auth failures mean all subsequent sends will also fail — abort the campaign.
+          if (httpStatus === 401 || httpStatus === 403 || twilioCode === 20003 || twilioCode === 20005) {
+            console.error(`🚨 Auth failure sending to ${number} (${httpStatus ?? twilioCode}). Aborting campaign:`, error.message)
+            campaignStatus.cancelRequested = true
+            return
+          }
+
+          // Invalid number or destination — log clearly but keep going.
+          const isPermanent = httpStatus === 400 || twilioCode === 21211 || twilioCode === 21408 || twilioCode === 21610
+          if (isPermanent) {
+            console.error(`⚠️ Permanent failure for ${number} (${httpStatus ?? twilioCode}), skipping:`, error.message)
+          } else {
+            console.error(`❌ Failed to send template to ${number}:`, error.message)
+          }
         }
+      }))
 
-        // Skip already-contacted users when skipDuplicates is on
-        if (skipDuplicates && (state.campaignCount || 0) > 0) {
-          console.log(`⏭️ Skipping duplicate ${number} (already contacted ${state.campaignCount} time(s))`)
-          continue
-        }
-
-        // 5. Track campaign touches
-        const campaignCount = (state.campaignCount || 0) + 1
-        const previousStage = state.stage || STAGES.INITIAL
-
-        if (campaignCount > 1 && previousStage !== STAGES.INITIAL) {
-          console.log(`🔁 Re-contacting ${number} (touch #${campaignCount}, prev stage: ${previousStage})`)
-        }
-
-        await sendTemplate(number)
-
-        state.campaignCount = campaignCount
-        state.lastCampaignAt = Date.now()
-        state.lastCampaignStage = previousStage
-        await persistUserState(number, state)
-
-        campaignStatus.sentCount += 1
-
-        // Time-aware follow-up
-        scheduleFollowUp(number)
-
+      if (i + BATCH_SIZE < campaignTargets.length && !campaignStatus.cancelRequested) {
         await delay(config.campaign.staggerMs)
-      } catch (error) {
-        campaignStatus.failedCount += 1
-        campaignStatus.lastError = error.message
-        console.error(`❌ Failed to send template to ${number}:`, error.message)
       }
     }
   }
@@ -1326,11 +1385,16 @@ export function createConversationEngine({
     }
   }
 
+  function destroy() {
+    clearInterval(dedupeCleanupInterval)
+  }
+
   return {
     processInbound,
     triggerTemplateCampaign,
     startTemplateCampaign,
     cancelCampaign,
-    getCampaignStatus
+    getCampaignStatus,
+    destroy
   }
 }

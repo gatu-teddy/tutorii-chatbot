@@ -108,7 +108,7 @@ export function createMongoStateRepository({
 
   return {
     async init() {
-      connection = await mongoose.createConnection(uri, { dbName: databaseName }).asPromise()
+      connection = await mongoose.createConnection(uri, { dbName: databaseName, maxPoolSize: 50 }).asPromise()
       UserModel = getChatUserModel(connection)
       MessageModel = getChatMessageModel(connection)
 

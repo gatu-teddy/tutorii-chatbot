@@ -78,7 +78,8 @@ export const config = {
       : 0.15
   },
   campaign: {
-    staggerMs: toPositiveNumber(process.env.CAMPAIGN_STAGGER_MS, 1800)
+    staggerMs: toPositiveNumber(process.env.CAMPAIGN_STAGGER_MS, 1800),
+    batchSize: toPositiveNumber(process.env.CAMPAIGN_BATCH_SIZE, 10)
   },
   conversation: {
     inboundDedupeTtlMs: toPositiveNumber(process.env.INBOUND_DEDUPE_TTL_MS, 5 * 60 * 1000),
