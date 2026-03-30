@@ -1,5 +1,6 @@
 import express from "express"
 import bodyParser from "body-parser"
+import twilio from "twilio"
 import { normalizeNumber } from "../utils/index.js"
 import { createAdminRouter } from "./admin/routes.js"
 
@@ -12,6 +13,23 @@ export function createServer({ config, conversationEngine, targetsManager }) {
 
   app.post("/webhook", (req, res) => {
     try {
+      // Validate Twilio signature when BASE_URL is configured.
+      // Skip in local dev (no BASE_URL) so you can test with ngrok without extra setup.
+      if (config.baseUrl) {
+        const twilioSignature = req.headers["x-twilio-signature"] || ""
+        const webhookUrl = `${config.baseUrl}/webhook`
+        const isValid = twilio.validateRequest(
+          config.twilio.authToken,
+          twilioSignature,
+          webhookUrl,
+          req.body
+        )
+        if (!isValid) {
+          console.warn("⚠️ Rejected webhook — invalid Twilio signature")
+          return res.sendStatus(403)
+        }
+      }
+
       const from = normalizeNumber(req.body.From)
       const body = req.body.Body?.trim() || ""
       const messageSid =

@@ -45,6 +45,7 @@ const mongoEnabled = Boolean(mongoUri || process.env.MONGODB_HOST)
 
 export const config = {
   port: toPositiveNumber(process.env.PORT, 3000),
+  baseUrl: (process.env.BASE_URL || "").replace(/\/$/, ""),
   promptsDir: PROMPTS_DIR,
   targets: new Set(DEFAULT_TARGET_NUMBERS),
   defaultTargets: DEFAULT_TARGET_NUMBERS.slice(),
@@ -61,7 +62,7 @@ export const config = {
     templateSid: process.env.TWILIO_TEMPLATE_SID || "HX77c245dfbe464ef9f475cc9963735854",
     // Win-back re-engagement template — must be a pre-approved WhatsApp template in Twilio.
     // Set TWILIO_WIN_BACK_TEMPLATE_SID in your environment when you have one ready.
-    winBackTemplateSid: process.env.TWILIO_WIN_BACK_TEMPLATE_SID || "HX6b309b4d3282ef4af75349e7c2836c8b"
+    winBackTemplateSid: process.env.TWILIO_WIN_BACK_TEMPLATE_SID || ""
   },
   openai: {
     apiKey: getRequired("OPENAI_KEY or GPT_API_KEY", openAIApiKey),
@@ -94,7 +95,10 @@ export const config = {
     maxHistoryMessages: toPositiveNumber(process.env.MAX_HISTORY_MESSAGES, 20),
     // Re-engagement delays
     stalledDelayMs: toPositiveNumber(process.env.STALLED_DELAY_MS, 3 * 24 * 60 * 60 * 1000),   // 3 days
-    winBackDelayMs: toPositiveNumber(process.env.WIN_BACK_DELAY_MS, 21* 24 * 60 * 60 * 1000)  // 21 days
+    winBackDelayMs: Math.min(
+      toPositiveNumber(process.env.WIN_BACK_DELAY_MS, 21 * 24 * 60 * 60 * 1000),
+      2_000_000_000  // hard cap at ~23 days — above this Node's setTimeout overflows silently
+    )
   },
   mongodb: {
     enabled: mongoEnabled,

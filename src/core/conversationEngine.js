@@ -1,4 +1,4 @@
-import { delay, normalizeText } from "../utils/index.js"
+import { delay, normalizeText, safeSetTimeout } from "../utils/index.js"
 import { STAGES } from "../constants/stages.js"
 import {
   appendHistory,
@@ -562,7 +562,8 @@ export function createConversationEngine({
   twilioClient,
   openAIClient,
   promptManager,
-  config
+  config,
+  stateRepository
 }) {
   const userQueues = new Map()
   const processedInbound = new Map()
@@ -835,6 +836,9 @@ export function createConversationEngine({
         timerMap.delete(userNumber)
       }
     }
+    stateRepository?.setTimerSchedule(userNumber, "followUpScheduledAt", 0).catch(() => {})
+    stateRepository?.setTimerSchedule(userNumber, "stalledScheduledAt", 0).catch(() => {})
+    stateRepository?.setTimerSchedule(userNumber, "winBackScheduledAt", 0).catch(() => {})
   }
 
   function cancelFollowUp(userNumber) {
@@ -843,6 +847,7 @@ export function createConversationEngine({
       clearTimeout(existing)
       followUpTimers.delete(userNumber)
     }
+    stateRepository?.setTimerSchedule(userNumber, "followUpScheduledAt", 0).catch(() => {})
   }
 
   // 4. Time-aware scheduling — delays until next good Gulf send window
@@ -857,14 +862,20 @@ export function createConversationEngine({
   function scheduleFollowUp(userNumber) {
     cancelFollowUp(userNumber)
 
-    const delayMs = computeTimeAwareDelay(followUpDelayMs)
+    // Spread follow-ups across a ±2 hour window to prevent all 1000 firing simultaneously
+    const JITTER_MS = 2 * 60 * 60 * 1000
+    const jitter = Math.floor(Math.random() * JITTER_MS * 2) - JITTER_MS
+    const delayMs = computeTimeAwareDelay(Math.max(0, followUpDelayMs + jitter))
+    const scheduledAt = Date.now() + delayMs
 
-    const timer = setTimeout(() => {
+    const timer = safeSetTimeout(() => {
       followUpTimers.delete(userNumber)
+      stateRepository?.setTimerSchedule(userNumber, "followUpScheduledAt", 0).catch(() => {})
       enqueueUserTask(userNumber, () => sendFollowUp(userNumber))
     }, delayMs)
 
     followUpTimers.set(userNumber, timer)
+    stateRepository?.setTimerSchedule(userNumber, "followUpScheduledAt", scheduledAt).catch(() => {})
   }
 
   // 1. Schedule STALLED re-engagement (3 days of silence)
@@ -875,16 +886,19 @@ export function createConversationEngine({
     }
 
     const delayMs = computeTimeAwareDelay(stalledDelayMs)
+    const scheduledAt = Date.now() + delayMs
 
-    const timer = setTimeout(() => {
+    const timer = safeSetTimeout(() => {
       stalledTimers.delete(userNumber)
+      stateRepository?.setTimerSchedule(userNumber, "stalledScheduledAt", 0).catch(() => {})
       enqueueUserTask(userNumber, () => sendStalledMessage(userNumber))
     }, delayMs)
 
     stalledTimers.set(userNumber, timer)
+    stateRepository?.setTimerSchedule(userNumber, "stalledScheduledAt", scheduledAt).catch(() => {})
   }
 
-  // 7. Schedule win-back (30 days after opt-out)
+  // 7. Schedule win-back (21 days after opt-out)
   function scheduleWinBack(userNumber) {
     const existing = winBackTimers.get(userNumber)
     if (existing) {
@@ -892,13 +906,16 @@ export function createConversationEngine({
     }
 
     const delayMs = computeTimeAwareDelay(winBackDelayMs)
+    const scheduledAt = Date.now() + delayMs
 
-    const timer = setTimeout(() => {
+    const timer = safeSetTimeout(() => {
       winBackTimers.delete(userNumber)
+      stateRepository?.setTimerSchedule(userNumber, "winBackScheduledAt", 0).catch(() => {})
       enqueueUserTask(userNumber, () => sendWinBack(userNumber))
     }, delayMs)
 
     winBackTimers.set(userNumber, timer)
+    stateRepository?.setTimerSchedule(userNumber, "winBackScheduledAt", scheduledAt).catch(() => {})
   }
 
   // -------------------------------------------------------------------------
@@ -989,6 +1006,11 @@ export function createConversationEngine({
   // -------------------------------------------------------------------------
 
   async function sendWinBack(userNumber) {
+    if (!config.twilio.winBackTemplateSid) {
+      console.warn(`⚠️ WIN_BACK skipped for ${userNumber} — TWILIO_WIN_BACK_TEMPLATE_SID not configured`)
+      return
+    }
+
     const state = await getUserState(userNumber, config.conversation.maxHistoryMessages)
 
     if (!state.optedOut) return
@@ -1385,11 +1407,65 @@ export function createConversationEngine({
     }
   }
 
+  async function init() {
+    if (!stateRepository?.findUsersWithPendingTimers) return
+
+    let pending
+    try {
+      pending = await stateRepository.findUsersWithPendingTimers()
+    } catch (err) {
+      console.error("❌ Failed to restore timers from DB:", err.message)
+      return
+    }
+
+    const now = Date.now()
+    const MIN_DELAY = 5000 // fire after at least 5s so the server finishes booting
+
+    for (const doc of pending) {
+      const userNumber = doc._id
+
+      if (doc.followUpScheduledAt > now) {
+        const delay = Math.max(MIN_DELAY, doc.followUpScheduledAt - now)
+        const timer = setTimeout(() => {
+          followUpTimers.delete(userNumber)
+          stateRepository.setTimerSchedule(userNumber, "followUpScheduledAt", 0).catch(() => {})
+          enqueueUserTask(userNumber, () => sendFollowUp(userNumber))
+        }, delay)
+        followUpTimers.set(userNumber, timer)
+      }
+
+      if (doc.stalledScheduledAt > now) {
+        const delay = Math.max(MIN_DELAY, doc.stalledScheduledAt - now)
+        const timer = setTimeout(() => {
+          stalledTimers.delete(userNumber)
+          stateRepository.setTimerSchedule(userNumber, "stalledScheduledAt", 0).catch(() => {})
+          enqueueUserTask(userNumber, () => sendStalledMessage(userNumber))
+        }, delay)
+        stalledTimers.set(userNumber, timer)
+      }
+
+      if (doc.winBackScheduledAt > now) {
+        const delay = Math.max(MIN_DELAY, doc.winBackScheduledAt - now)
+        const timer = setTimeout(() => {
+          winBackTimers.delete(userNumber)
+          stateRepository.setTimerSchedule(userNumber, "winBackScheduledAt", 0).catch(() => {})
+          enqueueUserTask(userNumber, () => sendWinBack(userNumber))
+        }, delay)
+        winBackTimers.set(userNumber, timer)
+      }
+    }
+
+    if (pending.length > 0) {
+      console.log(`⏰ Restored ${pending.length} pending timer(s) from DB`)
+    }
+  }
+
   function destroy() {
     clearInterval(dedupeCleanupInterval)
   }
 
   return {
+    init,
     processInbound,
     triggerTemplateCampaign,
     startTemplateCampaign,

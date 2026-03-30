@@ -151,7 +151,15 @@ export function createMongoStateRepository({
           optedOut: false,
           history,
           lastOutboundAt: 0,
-          lastOutboundFingerprint: ""
+          lastOutboundFingerprint: "",
+          campaignCount: 0,
+          lastCampaignAt: 0,
+          lastCampaignStage: "",
+          followUpCount: 0,
+          lastInboundAt: 0,
+          stalledSent: false,
+          winBackSent: false,
+          optedOutAt: 0
         }
       }
 
@@ -161,7 +169,15 @@ export function createMongoStateRepository({
         optedOut: Boolean(userDoc.optedOut),
         history,
         lastOutboundAt: Number(userDoc.lastOutboundAt) || 0,
-        lastOutboundFingerprint: String(userDoc.lastOutboundFingerprint || "")
+        lastOutboundFingerprint: String(userDoc.lastOutboundFingerprint || ""),
+        campaignCount: Number(userDoc.campaignCount) || 0,
+        lastCampaignAt: Number(userDoc.lastCampaignAt) || 0,
+        lastCampaignStage: String(userDoc.lastCampaignStage || ""),
+        followUpCount: Number(userDoc.followUpCount) || 0,
+        lastInboundAt: Number(userDoc.lastInboundAt) || 0,
+        stalledSent: Boolean(userDoc.stalledSent),
+        winBackSent: Boolean(userDoc.winBackSent),
+        optedOutAt: Number(userDoc.optedOutAt) || 0
       }
     },
 
@@ -178,6 +194,14 @@ export function createMongoStateRepository({
             optedOut: Boolean(state.optedOut),
             lastOutboundAt: Number(state.lastOutboundAt) || 0,
             lastOutboundFingerprint: String(state.lastOutboundFingerprint || ""),
+            campaignCount: Number(state.campaignCount) || 0,
+            lastCampaignAt: Number(state.lastCampaignAt) || 0,
+            lastCampaignStage: String(state.lastCampaignStage || ""),
+            followUpCount: Number(state.followUpCount) || 0,
+            lastInboundAt: Number(state.lastInboundAt) || 0,
+            stalledSent: Boolean(state.stalledSent),
+            winBackSent: Boolean(state.winBackSent),
+            optedOutAt: Number(state.optedOutAt) || 0,
             updatedAt: now
           },
           $setOnInsert: {
@@ -186,6 +210,28 @@ export function createMongoStateRepository({
         },
         { upsert: true }
       )
+    },
+
+    async setTimerSchedule(userNumber, field, scheduledAt) {
+      ensureInitialized()
+      const allowed = new Set(["followUpScheduledAt", "stalledScheduledAt", "winBackScheduledAt"])
+      if (!allowed.has(field)) throw new Error(`Invalid timer field: ${field}`)
+      await UserModel.updateOne(
+        { _id: userNumber },
+        { $set: { [field]: scheduledAt, updatedAt: new Date() } }
+      )
+    },
+
+    async findUsersWithPendingTimers() {
+      ensureInitialized()
+      const now = Date.now()
+      return UserModel.find({
+        $or: [
+          { followUpScheduledAt: { $gt: now } },
+          { stalledScheduledAt: { $gt: now } },
+          { winBackScheduledAt: { $gt: now } }
+        ]
+      }).select({ _id: 1, followUpScheduledAt: 1, stalledScheduledAt: 1, winBackScheduledAt: 1 }).lean()
     },
 
     async appendHistory(userNumber, role, content, requestedMaxHistoryMessages) {

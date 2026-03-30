@@ -1,5 +1,6 @@
 import axios from "axios"
 import { STAGES } from "../constants/stages.js"
+import { createSemaphore } from "../utils/index.js"
 
 const OPENAI_ENDPOINT = "https://api.openai.com/v1/chat/completions"
 const VALID_STAGES = new Set(Object.values(STAGES))
@@ -82,8 +83,10 @@ export function createOpenAIClient({
   temperature,
   maxTokens,
   frequencyPenalty = 0,
-  presencePenalty = 0
+  presencePenalty = 0,
+  maxConcurrent = 10
 }) {
+  const semaphore = createSemaphore(maxConcurrent)
   async function requestChatCompletion(body) {
     const MAX_RETRIES = 3
     let lastError
@@ -117,6 +120,8 @@ export function createOpenAIClient({
 
   return {
     async generateTurn(messages) {
+      await semaphore.acquire()
+
       const decisionMessages = [
         ...messages,
         { role: "system", content: TURN_DECISION_INSTRUCTIONS }
@@ -158,6 +163,8 @@ export function createOpenAIClient({
             markOptedOut: false
           }
         }
+      } finally {
+        semaphore.release()
       }
     }
   }

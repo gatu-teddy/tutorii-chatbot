@@ -65,9 +65,11 @@ async function bootstrap() {
     twilioClient,
     openAIClient,
     promptManager,
-    config
+    config,
+    stateRepository
   })
   global.__conversationEngine = conversationEngine
+  await conversationEngine.init()
 
   const app = createServer({
     config,
