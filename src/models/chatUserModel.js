@@ -18,6 +18,22 @@ const chatUserSchema = new mongoose.Schema(
     stalledSent: { type: Boolean, default: false },
     winBackSent: { type: Boolean, default: false },
     optedOutAt: { type: Number, default: 0 },
+    // Killswitch — set permanently if user threatens legal/regulatory action.
+    // Bot ignores all future inbound and is excluded from all future campaigns.
+    killswitchTriggered: { type: Boolean, default: false },
+    killswitchTriggeredAt: { type: Number, default: 0 },
+    killswitchMessage: { type: String, default: "" },
+    // Agent email capture (the email they want their account set up under)
+    agentEmail: { type: String, default: "" },
+    agentEmailCapturedAt: { type: Number, default: 0 },
+    // Provisioning state — written by the Tutorii platform's polling job
+    // once it has created the agent account. Bot polls these to know when
+    // to send the welcome WhatsApp with credentials + handbook.
+    accountProvisioned: { type: Boolean, default: false },
+    provisionedAt: { type: Number, default: 0 },
+    tutoriiUserId: { type: String, default: "" },
+    welcomeWhatsAppSent: { type: Boolean, default: false },
+    welcomeSentAt: { type: Number, default: 0 },
     // Timer persistence — Unix ms timestamps of when each timer should fire (0 = not scheduled)
     followUpScheduledAt: { type: Number, default: 0 },
     stalledScheduledAt: { type: Number, default: 0 },
@@ -29,6 +45,9 @@ const chatUserSchema = new mongoose.Schema(
 )
 
 chatUserSchema.index({ updatedAt: -1 })
+// Indexes for platform & bot polling queries — keeps lookups fast at scale
+chatUserSchema.index({ linkSent: 1, accountProvisioned: 1 })       // platform: find pending provisioning
+chatUserSchema.index({ accountProvisioned: 1, welcomeWhatsAppSent: 1 })  // bot: find ready-to-welcome
 
 export function getChatUserModel(connection) {
   return connection.models.ChatUser

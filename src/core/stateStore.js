@@ -17,6 +17,14 @@ function createDefaultState() {
     stalledSent: false,
     winBackSent: false,
     optedOutAt: 0,
+    // Killswitch — set when user threatens legal/regulatory action.
+    // Once true, the bot is permanently silenced for this user.
+    killswitchTriggered: false,
+    killswitchTriggeredAt: 0,
+    killswitchMessage: "",
+    // Agent email capture
+    agentEmail: "",
+    agentEmailCapturedAt: 0,
     // Campaign tracking
     campaignCount: 0,
     lastCampaignAt: 0,

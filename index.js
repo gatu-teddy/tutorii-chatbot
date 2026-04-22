@@ -23,9 +23,7 @@ const openAIClient = createOpenAIClient({
   presencePenalty: config.openai.presencePenalty
 })
 
-const promptManager = createPromptManager({
-  promptsDir: config.promptsDir
-})
+const promptManager = createPromptManager()
 
 async function bootstrap() {
   if (config.adminUi.password === "change-me") {

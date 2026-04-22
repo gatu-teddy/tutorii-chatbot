@@ -7,145 +7,179 @@ import {
   persistUserState
 } from "./stateStore.js"
 
-// ===========================================================================
-//  IMPORTANT — STAGES constant must now include two new values:
-//
-//    export const STAGES = {
-//      INITIAL:    "initial",
-//      INTERESTED: "interested",
-//      QUALIFIED:  "qualified",
-//      LINK_SENT:  "link_sent",
-//      STALLED:    "stalled",      // ← NEW
-//      WIN_BACK:   "win_back"      // ← NEW
-//    }
-//
-//  Update your constants/stages.js file to match.
-// ===========================================================================
-
-// ===========================================================================
-//  NEW STATE FIELDS — add these defaults to your stateStore.js:
-//
-//    stalledSent:      false,
-//    winBackSent:      false,
-//    optedOutAt:       0,
-//    campaignCount:    0,
-//    lastCampaignAt:   0,
-//    lastCampaignStage: "",
-//    followUpCount:    0,
-//    lastInboundAt:    0
-// ===========================================================================
-
-// ===========================================================================
-//  NEW CONFIG FIELDS — add to config.conversation:
-//
-//    stalledDelayMs:   259200000,    // 3 days
-//    winBackDelayMs:   2592000000,   // 30 days
-//
-//  Add to config.twilio:
-//
-//    winBackTemplateSid: "HX..."     // Pre-approved WhatsApp template
-// ===========================================================================
-
-// ===========================================================================
-//  PROMPT MANAGER CONTRACT — promptManager.buildMessages() now receives:
-//
-//    promptManager.buildMessages({
-//      state,
-//      history,
-//      objectionPrompt,   // string | null — injected instruction for handling a detected objection
-//      socialProof,       // string — a social proof statement to weave in naturally
-//      productKnowledge   // string — full product fact sheet to include in system prompt
-//    })
-//
-//  Your promptManager should:
-//  1. Include productKnowledge in the system prompt so the LLM has accurate facts
-//  2. Append objectionPrompt (if present) to the system prompt for that turn
-//  3. Include socialProof in the system prompt as a fact David can reference
-// ===========================================================================
-
 
 // ---------------------------------------------------------------------------
 // Product knowledge — single source of truth for all Tutorii facts.
 // Passed to the LLM every turn so David never gets details wrong.
+// CONTEXT: We are recruiting INDEPENDENT SALES AGENTS, not paying subscribers.
+// Agents get FREE accounts and earn commissions by recruiting paying subscribers.
 // ---------------------------------------------------------------------------
 
 const PRODUCT_KNOWLEDGE = `
-=== TUTORII — PRODUCT FACT SHEET ===
+=== TUTORII — AGENT RECRUITMENT FACT SHEET ===
 
-WHAT IT IS:
-Tutorii is a subscription platform that lets you earn recurring passive income through a 40% referral commission — backed by a real education product built for expats in the UAE and GCC. Subscribers get a referral dashboard, access to structured courses, and a built-in AI chat tutor available 24/7.
+CONTEXT — WHO YOU ARE TALKING TO:
+You are recruiting independent sales agents for Tutorii. You found their CV on GulfTalent and shortlisted them from a large pool of candidates because their profile is a strong fit.
+These people are NOT being asked to pay anything. They get a FREE account, full training materials, and ongoing support.
+Their role is to share their referral link and recruit PAYING subscribers (AED 95/month).
+They earn 40% commission on every subscriber they bring in, recurring monthly.
 
-THE EARNING OPPORTUNITY:
-- Level 1 (direct referrals): 40% = AED 38 per referral per month, for as long as they stay subscribed.
-- Level 2 (their referrals): 5% = AED 4.75 per referral per month.
-- Only 2 levels. No infinite depth. Commissions come from subscription revenue, not sign-up fees.
+==========================================================
+*** CRITICAL — THE WEBSITE EXPLAINER (memorise this) ***
+==========================================================
+
+There is ONE website: www.tutorii.com
+Everyone — agents and paying subscribers — uses the same platform.
+
+When the prospect visits the website, they will see:
+- "AED 95/month" subscription pricing
+- "Subscribe" buttons
+- Marketing copy aimed at paying subscribers
+- The full product (courses, dashboard, AI tutor)
+
+This is INTENTIONAL and you should ENCOURAGE them to visit the site.
+Why? Because the website shows them exactly what they'll be selling.
+Their future subscribers will pay AED 95/month for that platform.
+They (as agents) get the same platform for FREE, and earn 40% commission when they sell it to others.
+
+ALWAYS direct prospects to the website to build trust:
+"Have a look at www.tutorii.com — that's what subscribers see and pay AED 95/month for. You get the same platform completely free as an agent, plus you earn AED 38/month every time someone subscribes through your link."
+
+If they ask "but the website is asking me to subscribe / pay AED 95" or similar:
+Acknowledge it directly, don't dodge it:
+- "Yes — that's because the website is built for paying subscribers. They're your customers."
+- "As an agent, we set up your account manually on our side — you don't go through the public sign-up flow."
+- "You're seeing what your future subscribers see. You get the same access for free, and you earn 40% commission on every subscription you bring in."
+- This is a positive — it proves the product is real, has real pricing, and real customers.
+
+This framing turns a potential confusion into proof that the opportunity is legitimate.
+
+==========================================================
+
+WHAT TUTORII IS:
+Tutorii is a subscription education platform for expats in the UAE and GCC. It has video courses, PDF guides, and a built-in AI tutor. Subscribers pay AED 95/month. Website: www.tutorii.com
+
+WHAT THE AGENT ROLE IS:
+- Independent sales agent — not a job, not employment. Fully flexible, work on your own schedule.
+- You get a FREE Tutorii account (you do not pay anything, ever).
+- You get a personal referral link in your dashboard.
+- You get a sales script handbook with proven scripts and objection handlers.
+- You get ongoing support from the team — you're not on your own.
+- No targets, no minimum hours, no joining fee, no contract, no commitment.
+- Stop anytime. Your account stays free.
+
+WHY THIS WORKS (KEY PITCH POINTS):
+- The product genuinely solves a problem for expats — visa rules, workers rights, financial planning. People stay subscribed because they get value, which means your commission is recurring and stable.
+- 40% is one of the highest commission rates in the industry. Most affiliate programmes pay 5-15%.
+- Weekly payouts (not monthly) means cash hits your account fast.
+- MamoPay is CBUAE-licensed. This is a regulated, legitimate UAE business.
+- Same model as Uber, Careem, bank referral programmes — proven and trusted.
+
+THE EARNING STRUCTURE:
+- Level 1 (direct referrals): 40% = AED 38 per subscriber per month, recurring as long as they stay subscribed.
+- Level 2 (their referrals): 5% = AED 4.75 per subscriber per month, also recurring.
+- Only 2 levels. No infinite depth. Commissions come from real subscription payments.
 - No cap on earnings. No limit on number of referrals.
-- Referral link provided in your dashboard. Share via WhatsApp, SMS, email, social media — anywhere.
-- Referral assignment is permanent and irrevocable at the moment of signup.
 
-INCOME BENCHMARKS:
-- 3 referrals = AED 114/month gross (covers subscription + profit from day one)
-- 10 referrals = AED 380/month gross (meaningful side income)
-- 25 referrals + ~20 L2 = exceeds most part-time jobs
-- 50 referrals + ~50 L2 = real income stream
+INCOME BENCHMARKS — REALISTIC SCENARIOS:
+- Week 1 (5 referrals from inner circle): AED 190/month = AED 47.50/week recurring
+- Month 1 (10 referrals): AED 380/month recurring
+- Month 3 (25 referrals): AED 950/month recurring
+- Month 6 (50 referrals + 50 L2): AED 2,137.50/month recurring
+- These are recurring — you earn every month for as long as each subscriber stays active.
 
-PAYOUTS — HOW THE MONEY REACHES YOU:
-- Step 1: You sign up and enter your IBAN in the dashboard under Account Settings. That's it — no extra bank setup, no payment app, no verification calls.
-- Step 2: Every time someone subscribes through your referral link, Tutorii automatically calculates your 40% commission (AED 38 per L1 referral, AED 4.75 per L2 referral).
-- Step 3: Commissions accumulate in your dashboard in real-time. You can see exactly what you've earned, what's pending, and what's been paid.
-- Step 4: Every Tuesday at 9AM Dubai time, Tutorii triggers an automatic payout via MamoPay. If your pending balance is AED 50 or above, the full amount is transferred to your IBAN.
-- Step 5: The bank transfer typically arrives within 1–3 business days depending on your bank.
-- MamoPay is the payment processor — they are CBUAE-licensed (Central Bank of UAE regulated) and handle all the money movement.
-- You can change your IBAN at any time in Settings. Only one IBAN can be active.
-- Accepts IBANs from any country — UAE, India, Philippines, Pakistan, anywhere. Not limited to UAE banks.
-- Pending earnings below AED 50 are forfeited if account is cancelled.
-- Tutorii does not charge any payout fees. Your bank may charge incoming transfer fees depending on your account type.
-- Payout statuses: "Processing" = submitted to MamoPay and in transit. "Completed" = funds transferred. "Failed" = bank rejected (usually wrong IBAN — fix it in Settings and it retries next Tuesday).
-- You are responsible for reporting and paying taxes on your earnings per your country's laws. Tutorii does not withhold taxes.
+WHY MOST AGENTS START EARNING WITHIN 7 DAYS:
+- Everyone has 5-10 contacts who'd genuinely benefit from the courses.
+- The sales handbook gives them ready-to-use scripts (no creative writing needed).
+- The platform sells itself once people see the content.
+- First payout is the following Tuesday after their first AED 50 in commission.
 
-PRICING:
-- AED 95/month. No contracts, no hidden fees, cancel anytime.
-- All sales are final — no refunds on payments already made.
-- Cancel from the dashboard Settings page. Access continues until end of billing period.
-- If you re-subscribe later, all your course progress is saved — you pick up where you left off.
+PAYOUTS — HOW AGENTS GET PAID:
+- Enter your IBAN in the dashboard under Account Settings. No extra setup needed.
+- Every Tuesday at 9AM Dubai time, Tutorii sends your earnings to your bank via MamoPay.
+- Minimum payout is AED 50. If you're above that, the full amount is transferred automatically.
+- Money typically arrives within 1–5 business days from when MamoPay releases the funds, depending on your bank.
+- MamoPay is CBUAE-licensed (Central Bank of UAE regulated).
+- Accepts IBANs from any country — UAE, India, Philippines, Pakistan, anywhere.
+- Tutorii does not charge payout fees. Your bank may charge incoming transfer fees.
+- You are responsible for taxes per your country's laws.
 
-PAYMENT:
-- Visa, Mastercard, Apple Pay, Google Pay — all via MamoPay (CBUAE-licensed, PCI DSS compliant).
-- Tutorii never sees or stores card details.
+COST TO THE AGENT:
+- NOTHING. The agent account is completely free. No sign-up fee, no monthly fee, no hidden charges.
+- Agents only earn — they never pay.
+- The AED 95/month subscription is what THEIR REFERRALS pay, not the agent.
 
-WHAT'S INCLUDED (the product behind the earning):
+WHAT THE PRODUCT IS (so the agent understands what they're sharing):
 Courses — 5 modules, 20 lessons:
 1. Life in the UAE — Culture, government, healthcare, housing
-2. Workers Rights & Legal — Employment rights, disputes, visa rules, legal resources
-3. Job Search & Career — CV building, interviews, job portals, networking
-4. Financial Literacy — Budgeting, remittance, debt avoidance, saving & investing
-5. Entrepreneurship — Mindset, side hustles, freelancing, online income
+2. Workers Rights & Legal — Employment rights, disputes, visa rules
+3. Job Search & Career — CV building, interviews, job portals
+4. Financial Literacy — Budgeting, remittance, saving & investing
+5. Entrepreneurship — Side hustles, freelancing, online income
+- Each lesson is 8–25 minutes with video and/or PDF guides.
+- Built-in AI chat tutor available 24/7.
+- New content added regularly at no extra cost.
+- Works on any device with a browser. No app download needed.
 
-- Each lesson is 8–25 minutes with video content and/or downloadable PDF guides.
-- New modules added regularly. Upcoming: Digital Marketing, Mental Health & Wellbeing, Advanced Career Skills.
-- All new content included at no extra cost.
-- Courses currently in English. Arabic, Hindi, Urdu, and Tagalog on the roadmap.
+==========================================================
+*** CRITICAL — POST-AGREEMENT FLOW (memorise this) ***
+==========================================================
 
-AI CHAT TUTOR:
-- Built-in AI assistant available 24/7 inside the dashboard.
-- Knows the subscriber's account details, earnings, referrals, and course progress.
-- Can answer questions about billing, payouts, courses, UAE life, and platform policies.
+When the user agrees to join as an agent (says "yes", "I'm in", "let's do it", "set me up", etc.):
 
-PLATFORM ACCESS:
-- Works on any device with a browser — phone, tablet, laptop, desktop.
-- No app download needed. Progress syncs across all devices.
-- Available worldwide — anyone can subscribe, not just people in the UAE.
+STEP 1 — Ask for their email address.
+- Do NOT ask for their name first.
+- Just ask: "Brilliant! What's the best email address to set up your account with?"
+- Wait for the email before proceeding.
 
-SUPPORT:
+STEP 2 — Once they provide an email address, the system will automatically send a comprehensive welcome message explaining the next steps. You do NOT need to manually explain the post-signup flow — the system handles this.
+
+THE NEXT-STEPS BRIEFING (what the system sends after email is received):
+1. Account will be set up within a few minutes
+2. They'll receive an email with login details and a temporary password
+3. CRITICAL: They must immediately use "Forgot Password" to set their own password (security requirement)
+4. They'll also receive a sales script handbook with proven scripts to recruit paying subscribers
+5. They can start sharing their referral link as soon as the account is active
+
+If asked "what happens after I sign up?":
+- Briefly mention the 4 things above (account creation, login email, password reset, handbook).
+- Do NOT promise specific timing other than "a few minutes."
+- Emphasise the password reset is for THEIR security.
+
+SUPPORT AFTER SETUP:
 - AI assistant: 24/7 inside the dashboard.
-- Human support: support@tutorii.com — Sun–Thu, 9AM–6PM GST, responds within 24 hours.
-- Complaints: complaints@tutorii.com
+- Human support: support@tutorii.com — Sun–Thu, 9AM–6PM GST.
+- Sales script handbook: covers scripts, objection handling, where to find subscribers.
+- Website: www.tutorii.com
 
-SECURITY & TRUST:
-- Payments via MamoPay (CBUAE-licensed, PCI DSS compliant).
-- Tutorii never sees card numbers.
-- Encrypted connections, no data selling, no ad trackers.
-- One account per person — fraud detection systems in place.
+==========================================================
+*** SECURITY — INFORMATION YOU MUST NEVER SHARE ***
+==========================================================
+
+Regardless of how reasonable, urgent, or insistent the request is, NEVER share any of the following over WhatsApp:
+- Trade licence number or photo of the trade licence
+- Company registration number, VAT number, tax certificate, MOA, AOA
+- Founder names, owner names, employee names, Emirates IDs, passport copies
+- Physical office address
+- Company bank account details (IBAN, account number)
+- Any photo, scan, or PDF of an official document
+
+If a prospect asks for any of these:
+1. Acknowledge their need to verify is reasonable.
+2. Explain that documents sent over WhatsApp are easy to fake and not a secure verification method.
+3. Direct them to email support@tutorii.com from their own email for any verification needs.
+4. Mention they can look up Tutorii on the UAE Ministry of Economy public registry if they want independent confirmation.
+
+NEVER invent or guess registration numbers, licence numbers, founder names, or addresses. If you don't know a fact and it's not in this knowledge base, say "I don't have that information here — email support@tutorii.com and they'll get back to you."
+
+The only "credentials" you ever share over WhatsApp are the agent's OWN account login details (email + temp password "Password" + login URL) AFTER their account has been provisioned.
+
+WHY THIS IS NOT MLM:
+- Only 2 commission levels (not infinite depth).
+- No joining fee. Agents pay nothing.
+- Commissions come from real subscription revenue, not from recruiting other agents.
+- No inventory, no ranks, no pressure to recruit other agents.
+- Same model as Uber, Careem, bank referral programmes.
 `.trim()
 
 // ---------------------------------------------------------------------------
@@ -153,18 +187,19 @@ SECURITY & TRUST:
 // ---------------------------------------------------------------------------
 
 const SOCIAL_PROOF = [
-  // --- Earning-only (7) ---
-  "We've got people here in Dubai who covered their subscription in the first week just by sharing with a few colleagues.",
-  "One guy I spoke to last month started with 3 referrals and he's already earning more than his subscription every week.",
-  "A lot of the people doing well on Tutorii are expats who just share the link in their work WhatsApp groups — it spreads on its own.",
-  "Most people are surprised how fast it adds up. 40% recurring means every person you bring in keeps paying you monthly.",
-  "Someone I onboarded two weeks ago hit 10 referrals already. That's AED 380/month in commission.",
-  "I had someone sign up from outside the UAE — their friend referred them. The platform works worldwide, payouts go to any IBAN.",
-  "The people who do best just share their link in a couple of group chats and let it grow. No hard selling, just sharing.",
-  // --- Earning + education (3) ---
-  "One of the most popular lessons is Know Your Employment Rights — people share it with colleagues and that alone brings in referrals.",
-  "A teacher in Sharjah told me her colleagues all found the courses valuable. She just shared her link once and it spread on its own.",
-  "What makes the commissions stick is that people actually use the platform — the courses and AI tutor keep them subscribed, so your 40% keeps coming."
+  // --- Named, specific stories (5) — real names from the testimonial wall ---
+  "One of our agents, Priya — a healthcare worker in Dubai — covered her own subscription cost in week one with just 3 referrals. She's now well past 10.",
+  "David, an IT professional in Abu Dhabi, shared his link in two WhatsApp groups and within a month was earning more than his weekend freelancing.",
+  "Maria, a teacher in Sharjah, just shared her link with colleagues. The platform speaks for itself — she's at 12 active subscribers now.",
+  "An agent who joined two weeks ago hit his first AED 50 payout last Tuesday. The Tuesday after that he got AED 304. It compounds quickly.",
+  "We've had agents recover their week-one effort within 2-3 referrals. Beyond that, every subscriber is pure recurring monthly income.",
+  // --- Industry / structural credibility (3) ---
+  "40% recurring is rare in the industry — most affiliate programmes pay 5-15%. Tutorii pays at the top end because they want serious agents.",
+  "The agents doing best aren't necessarily salespeople — they're just people who actually use the platform first, then share what's useful.",
+  "Most expats know other expats who'd benefit from the courses. Workers rights, visa rules, financial planning — that content sells itself.",
+  // --- Reciprocity / support angle (2) ---
+  "Every agent gets a sales script handbook with proven scripts. You're not figuring this out alone.",
+  "We give agents everything — free account, training materials, scripts, ongoing support. The only thing you bring is your network."
 ]
 
 // ---------------------------------------------------------------------------
@@ -182,39 +217,94 @@ const OBJECTION_HANDLERS = [
     promptInjection:
       `The user suspects this might be a scam or MLM. Handle this calmly and directly:
 - Acknowledge it's a fair question — don't get defensive.
-- Be upfront: yes, there's a referral commission. That's the point. But here's why it's not MLM:
-- There are only 2 levels (not infinite depth). You earn on people you personally refer and one level below. That's it.
-- Commissions come from subscription revenue — real people paying for a real product — not from other people's sign-up fees.
-- The product behind it is a real education platform for expats with courses, an AI tutor, and content that people actually use. That's what makes it sustainable and shareable.
+- There are only 2 levels. You earn on people you personally refer (40%) and one level below (5%). That's it. No infinite downline.
+- There's no joining fee — the agent account is completely free. You never pay anything.
+- Commissions come from real subscription revenue — people paying for courses they actually use — not from other agents' pockets.
+- The product behind it is a real education platform with courses, an AI tutor, and content that people genuinely use.
 - Payments are handled by MamoPay, a CBUAE-licensed provider.
-- Keep it short, confident, factual. Don't over-explain.`
+- Same model as Uber, Careem, bank referral programmes.
+- Keep it short, confident, factual.`
+  },
+  {
+    name: "is_this_a_job",
+    patterns: [
+      /\b(is this a job|job offer|employment|salary|contract|full.?time|part.?time|position|vacancy|role|hire me)\b/i,
+      /\b(are you hiring|do you have.*position)\b/i
+    ],
+    promptInjection:
+      `The user thinks this is a job offer. Clarify immediately:
+- This is NOT a job, not employment, and not a salaried position.
+- You're recruiting independent sales agents. They work on their own schedule, no targets, no boss.
+- They earn commission based on results — every subscriber they bring in earns them AED 38/month recurring.
+- The account is free. There's no cost, no contract, no commitment.
+- Frame it as a flexible earning opportunity, not employment.
+- Keep it to 2-3 sentences. Don't over-explain.`
   },
   {
     name: "no_time",
     patterns: [
-      /\b(no time|don'?t have time|too busy|not now|maybe later|busy right now)\b/i,
-      /\b(swamped|slammed|hectic)\b/i
+      /\b(no time|don'?t have time|too busy|busy right now)\b/i,
+      /\b(swamped|slammed|hectic|in a meeting|at work right now)\b/i
     ],
     promptInjection:
-      `The user says they don't have time. Reframe it:
-- The earning side is passive — share a link once, earn monthly. No daily work.
-- The courses are 8-25 min lessons they can do on their phone whenever — no app download, just open in the browser.
-- There's also an AI tutor inside the platform that answers questions instantly, so no waiting around.
-- Suggest you send the link now so they have it when they're free. No pressure to start immediately.
-- Keep it to 1-2 sentences. Don't lecture about time management.`
+      `The user says they're busy right now. STEP BACK — do NOT push for setup:
+- Acknowledge respectfully: "All good, no rush."
+- Make it easy to come back: "Whenever you have 5 minutes, just message me here and I'll get you set up."
+- Optionally suggest the website for when they have time: "If you want to peek at the platform first, it's at www.tutorii.com — couple of minutes."
+- Do NOT ask for their email now.
+- Do NOT push them to commit.
+- Keep it to 1-2 sentences. Pressure now turns warm leads cold.`
   },
   {
-    name: "cant_afford",
+    name: "defer_to_later",
     patterns: [
-      /\b(can'?t afford|too expensive|no money|tight budget|not worth|waste of money)\b/i,
-      /\b(AED 95 is a lot|that'?s expensive)\b/i
+      /\b(i'?ll (look|check|read|review|have a look|take a look|read up|check it out|look into (it|this)))\b/i,
+      /\b(let me (look|check|read|review|have a look|take a look|read up|check it out|look into (it|this)|see))\b/i,
+      /\b(i'?ll (get back to you|come back to you|message you back|reply later|let you know))\b/i,
+      /\b(can i (get back to you|come back to you|reply later|let you know))\b/i,
+      /\b(maybe later|later today|tonight|tomorrow|this evening|this weekend|next week|in (a )?(few|couple of))\b/i,
+      /\b(remind me|message me back)\b/i
     ],
     promptInjection:
-      `The user thinks it's too expensive. Use the break-even pitch:
-- AED 95/month, but just 3 referrals and the platform pays for itself.
-- Beyond 3 referrals you're in profit every single month.
-- Frame it as an investment that pays back fast, not an expense.
-- Don't be pushy about it — state the math simply and let them decide.`
+      `The user is deferring — they want to look at it later. This is NOT a no, and NOT an objection. Acknowledge gracefully and step back:
+- Acknowledge their timing: "Of course — take your time, no rush at all."
+- Be useful, not pushy: "When you do have a look, the platform itself is at www.tutorii.com. That's what your future subscribers will see."
+- Reduce friction for when they come back: "Once you've had a look, just message me here and I'll get your free account set up in 5 minutes."
+- If they mentioned a specific time (tonight, tomorrow, this weekend, next week), reference it warmly: "Speak then" or "Catch you tomorrow."
+- DO NOT ask for their email now.
+- DO NOT push for closing now.
+- DO NOT set sendLinkNow = true under any circumstances.
+- Keep it to 1-2 sentences. The bot's job here is to LEAVE THE DOOR OPEN, not slam it shut with pressure.`
+  },
+  {
+    name: "soft_no",
+    patterns: [
+      /\b(we'?ll see|i'?ll see|let me think about it|need to think|need some time to think|consider it)\b/i,
+      /\b(perhaps|might be (interested|something))\b/i,
+      /\b(not (right )?now|not at the moment|not at this time|not for me right now)\b/i
+    ],
+    promptInjection:
+      `The user is giving a soft no — polite but uncommitted. Don't push back. Don't try to convert. Respect it gracefully:
+- Acknowledge respectfully: "All good — no pressure at all."
+- Leave the door open without pestering: "If you ever want another look, just message me here."
+- Optionally point them to the site for self-service: "Platform is at www.tutorii.com if you ever want to see what we're about."
+- DO NOT pitch again.
+- DO NOT ask for their email.
+- DO NOT set sendLinkNow = true.
+- Keep it to 1-2 sentences. Pressure here just earns you a hard no.`
+  },
+  {
+    name: "what_cost",
+    patterns: [
+      /\b(what does it cost|how much|fee|pay anything|is it free|do i have to pay|investment|charge)\b/i,
+      /\b(what'?s the catch)\b/i
+    ],
+    promptInjection:
+      `The user wants to know if it costs anything. This is simple:
+- Nothing. The agent account is completely free. No sign-up fee, no monthly fee, no hidden charges. Ever.
+- The AED 95/month is what their REFERRALS pay — not the agent.
+- They only earn. They never pay.
+- Keep it to 1-2 sentences. This is a straightforward answer.`
   },
   {
     name: "send_more_info",
@@ -225,10 +315,11 @@ const OBJECTION_HANDLERS = [
     ],
     promptInjection:
       `The user wants more information. This is buying interest — don't kill momentum with a document dump.
-- Lead with the earning: Tutorii pays 40% recurring monthly commission on every person you refer. Paid weekly to your bank. 3 referrals covers the subscription, anything beyond that is profit.
-- Then briefly mention what backs it: it's a real education platform with courses on workers rights, visa rules, career skills, finance — stuff expats actually need. Plus a built-in AI tutor.
-- Then push toward the signup link: "honestly the best way to see it is to open the platform itself — want me to send the link?"
-- Do NOT say you'll email them a PDF or send more info later. Keep the conversation moving forward.`
+- Lead with the earning: Tutorii pays 40% recurring monthly commission on every subscriber you bring in. Paid weekly to your bank. Your account is free.
+- Then briefly mention what backs it: it's a real education platform with courses for expats — workers rights, visa rules, career skills. That's what people subscribe for.
+- Point them to the website: www.tutorii.com
+- Then push toward setup: "The best way to see it is to get set up with your free account — want me to do that for you?"
+- Do NOT say you'll email them a PDF or send info later. Keep the conversation moving forward.`
   },
   {
     name: "need_to_think",
@@ -237,11 +328,11 @@ const OBJECTION_HANDLERS = [
       /\b(i'?ll get back to you|will let you know)\b/i
     ],
     promptInjection:
-      `The user wants to think about it. This is a soft stall — handle it with an assumptive move:
+      `The user wants to think about it. Handle with a soft close:
 - Say "of course, take your time" — don't pressure.
-- But immediately follow with: "let me send you the link now so you have it when you're ready."
-- This gives them space while keeping the link in their chat. Set sendLinkNow = true if stage is QUALIFIED.
-- Do NOT just say "sure, let me know" and leave it. Always leave them with the link.`
+- Remind them there's no cost and no commitment: "The account is free so there's no risk. I can get you set up now and you can start whenever you're ready."
+- Point them to the website: www.tutorii.com
+- Don't just say "sure, let me know" and leave it. Always offer to set them up.`
   },
   {
     name: "how_got_number",
@@ -252,56 +343,25 @@ const OBJECTION_HANDLERS = [
     ],
     promptInjection:
       `The user wants to know how you got their number. Be honest and brief:
-- Say you found their CV online and thought their profile was a good fit.
-- Don't name a specific job site unless asked.
-- Quickly redirect: "I reached out because I thought this could be useful for someone with your background."
-- Keep it to 1-2 sentences. Don't over-apologize or get defensive.`
+- Say you found their CV on GulfTalent and thought their profile was a good fit for a sales agent role.
+- Don't over-apologize or get defensive.
+- Quickly redirect: "I reached out because I thought this earning opportunity could be a good fit for someone with your background."
+- Keep it to 1-2 sentences.`
   },
   {
-    name: "refund",
+    name: "what_do_i_sell",
     patterns: [
-      /\b(refund|money back|get my money|charged me|want my money)\b/i,
-      /\b(can i get a refund)\b/i
+      /\b(what (do|would) i (sell|promote|share|do))\b/i,
+      /\b(what'?s the product|what am i (selling|sharing|promoting))\b/i,
+      /\b(what is tutorii|what does tutorii do)\b/i
     ],
     promptInjection:
-      `The user is asking about refunds. Be honest and upfront:
-- All sales are final as per the Terms of Service. No refunds on payments already made.
-- They can cancel anytime from their dashboard Settings to stop future charges.
-- Access continues until the end of the current billing period.
-- If they re-subscribe later, all their course progress is saved.
-- Don't be apologetic about the policy — state it clearly and move on.
-- If they haven't signed up yet and are asking pre-sale, frame it as: "there are no refunds, but you can cancel anytime with no fees — and 3 referrals covers the cost anyway."`
-  },
-  {
-    name: "app_download",
-    patterns: [
-      /\b(download|app store|google play|install|is there an app)\b/i,
-      /\b(do i need to download)\b/i,
-      /\b(what phone|which phone|does it work on)\b/i
-    ],
-    promptInjection:
-      `The user is asking about downloading an app or device compatibility:
-- No app download needed. Tutorii works in any browser — phone, tablet, laptop, desktop.
-- Just open the link and sign up. Progress syncs across all devices automatically.
-- Keep it to 1 sentence. This is a simple answer — don't over-explain.`
-  },
-  {
-    name: "what_do_i_get",
-    patterns: [
-      /\b(what do i (actually )?get|what('?s| is) included|what am i paying for)\b/i,
-      /\b(what('?s| is) in it|what comes with)\b/i,
-      /\b(is it just courses|only courses)\b/i
-    ],
-    promptInjection:
-      `The user wants to know what they get for AED 95/month. Lead with the earning side, then the product:
-- A referral dashboard with your unique link, real-time tracking, and commission analytics.
-- 40% recurring commission on every referral, paid weekly to your bank. No cap on earnings.
-- 5 course modules with 20 lessons covering UAE life, legal rights, careers, finance, and entrepreneurship — this is what makes the product easy to share, because it's genuinely useful.
-- A built-in AI chat tutor available 24/7 that knows their account and can answer any question.
-- New courses added regularly at no extra cost.
-- Works on any device, no download needed.
-- Frame it as: "you get a way to earn AND a product that's actually worth sharing."
-- Keep it punchy — don't list every lesson.`
+      `The user wants to know what the product is. Direct them to the website to see for themselves:
+- "Have a look at www.tutorii.com — that's exactly what you'll be selling. Subscribers pay AED 95/month for the courses, AI tutor, and platform access."
+- Briefly summarise: education platform for expats — courses on UAE life, workers rights, career, finance, entrepreneurship. AI tutor. Mobile-friendly.
+- Reframe their role: "As an agent you don't need to be an education expert. You share your link, people subscribe, you earn 40% (AED 38/month) per subscriber."
+- Build confidence: "When you actually see the platform, you'll understand why it sells — the content is genuinely useful for expats."
+- End with: "Want me to set up your free account so you can have a proper look from inside?"`
   },
   {
     name: "how_get_paid",
@@ -314,16 +374,520 @@ const OBJECTION_HANDLERS = [
       /\b(payout|pay out|cash out|withdraw)\b/i
     ],
     promptInjection:
-      `The user wants to know how they get paid. This is a buying signal — they're already thinking about receiving money. Be clear and specific:
-- It's simple: you enter your IBAN in the dashboard and that's it. No extra apps, no verification calls, no payment platform to sign up for.
+      `The user wants to know how they get paid. This is a strong buying signal — they're already thinking about receiving money. Be clear:
+- You enter your IBAN in the dashboard. That's it — no extra apps, no verification, no payment platform to sign up for.
 - Every Tuesday at 9AM Dubai time, Tutorii automatically sends your earnings to your bank via MamoPay.
 - Minimum payout is AED 50. If you're above that, the full amount is transferred.
-- Money typically lands in your account within 1–3 business days depending on your bank.
-- MamoPay is CBUAE-licensed (regulated by the Central Bank of UAE) so it's fully legit.
-- Works with any IBAN worldwide — UAE, India, Philippines, Pakistan, wherever your bank is.
+- Money typically lands in 1–5 business days from when MamoPay releases the funds, depending on your bank.
+- MamoPay is CBUAE-licensed (regulated by the Central Bank of UAE).
+- Works with any IBAN worldwide — UAE, India, Philippines, Pakistan, wherever.
 - No payout fees from Tutorii's side.
-- You can track everything in real-time in your dashboard — what you've earned, what's pending, what's been paid.
-- Keep the tone confident and matter-of-fact. This is one of the strongest parts of the pitch — weekly payouts to their bank, no hoops to jump through.`
+- Keep the tone confident. This is one of the strongest parts of the pitch.`
+  },
+  {
+    name: "website_pay_confusion",
+    patterns: [
+      /\b(website|site|page|link).*\b(asking|wants|says).*\b(pay|subscribe|95|fee|money|charge)\b/i,
+      /\b(but|wait).*\b(it|website|site).*\b(aed 95|subscribe|paying|cost)\b/i,
+      /\b(why does|i thought|but you said).*\b(free|no cost)\b.*\b(website|site|95|subscribe)\b/i,
+      /\b(i went to|i checked|i looked at).*\b(website|site|tutorii\.com).*\b(subscribe|pay|95)\b/i,
+      /\b(do i (need|have) to (pay|subscribe))\b/i,
+      /\b(am i paying|will i pay|do i pay).*\b(95|subscribe|fee)\b/i
+    ],
+    promptInjection:
+      `The user has gone to the website and is confused because they see "Subscribe AED 95/month" buttons. This is a CRITICAL trust moment — handle directly and confidently:
+- Acknowledge what they're seeing: "Yes, the website shows the AED 95/month subscription — that's what your future customers (the paying subscribers) will pay."
+- Reframe positively: "You're seeing exactly what you'll be selling. As an agent, I set up your account manually on our side — you don't pay anything, ever."
+- Hammer the value: "Think of it this way: the people on that website are your customers. You earn 40% (AED 38/month) every time one of them subscribes through your link."
+- Reinforce the proof: "It actually works in your favour — you can see the platform is real, the pricing is real, and there are real paying customers. That's what makes the commission real."
+- End with: "Want me to get your free agent account set up?"`
+  },
+  {
+    name: "what_do_i_get",
+    patterns: [
+      /\b(what do i (actually )?get|what('?s| is) included|what am i (getting|paying for))\b/i,
+      /\b(what('?s| is) in it|what comes with)\b/i
+    ],
+    promptInjection:
+      `The user wants to know what they get as an agent. Be clear:
+- A free Tutorii account — no cost, ever.
+- Your own personal referral link in your dashboard.
+- A sales script handbook with proven scripts and objection handlers — so you're not figuring out what to say.
+- Real-time commission tracking — see exactly who's subscribed, what you've earned, what's pending.
+- Access to all the courses and AI tutor so you know what you're sharing.
+- 40% recurring commission (AED 38/month) on every subscriber, plus 5% (AED 4.75/month) on their referrals.
+- Weekly payouts every Tuesday to your bank account.
+- Ongoing support from the team — you're not on your own.
+- Frame it as: "You get everything you need to earn — and it costs you nothing."`
+  },
+  {
+    name: "what_happens_after_signup",
+    patterns: [
+      /\b(what happens (next|after)|how does (this|it) work after|what'?s the next step)\b/i,
+      /\b(once i (sign up|agree|join)|after (i|we) sign up)\b/i,
+      /\b(how (long|soon)|when (will|do) i)\b.*\b(start|get|receive|active|ready)\b/i,
+      /\b(setup process|onboarding process)\b/i
+    ],
+    promptInjection:
+      `The user wants to understand the setup process. Walk them through it briefly:
+1. You give me your email address.
+2. I create your free agent account within a few minutes.
+3. You receive an email with login details and a temporary password.
+4. You log in and immediately use 'Forgot Password' to set your own password (this is for YOUR security — we never know your password).
+5. You also receive a sales script handbook by email — proven scripts and objection handlers to recruit paying subscribers.
+6. You add your IBAN in Settings, grab your referral link from the dashboard, and start sharing.
+- Total time from agreement to earning: usually same day or next day.
+- Emphasise the password reset is for THEIR security — that's why we don't pre-set their password.
+- Keep it structured but conversational. End with: "Want me to get you started?"`
+  },
+  {
+    name: "do_i_get_training",
+    patterns: [
+      /\b(training|coaching|teach|do i need experience|how do i (sell|recruit|find people))\b/i,
+      /\b(scripts?|templates?|materials?|handbook|guide)\b/i,
+      /\b(what do i (say|tell people))\b/i
+    ],
+    promptInjection:
+      `The user wants to know about training and support:
+- Every agent gets a sales script handbook with proven WhatsApp scripts, objection handlers, and guidance on where to find subscribers.
+- You don't need any sales experience — the handbook walks you through everything.
+- The handbook covers: opening messages, the explanation, the closing, common objections, where to share your link.
+- Plus ongoing support from the team — you're not on your own.
+- Frame it as: "We give you the scripts. You bring the network. The platform sells itself."`
+  },
+  // ============================================================
+  //   TRUST & VERIFICATION (UAE WhatsApp scam scepticism)
+  // ============================================================
+  // ============================================================
+  //   COMPANY DOCUMENT / CREDENTIAL REQUESTS
+  //   Caught BEFORE trust_verification so the firm "no" rule wins.
+  // ============================================================
+  {
+    name: "request_company_documents",
+    patterns: [
+      /\b(send|share|forward|email|whatsapp|show|give) (me )?(your |the )?(trade licen[cs]e|registration (certificate|document|number)|moa|aoa|memorandum|articles of association|vat (certificate|number)|tax certificate|chamber of commerce)\b/i,
+      /\b(can (i |you )?(see|have|get) (your |the )?(trade licen[cs]e|registration|moa|aoa|vat number|tax (number|cert)))\b/i,
+      /\bwhat( is|'s| are)? (your |the )?(trade licen[cs]e|registration|vat|chamber of commerce)( (number|certificate))?\b/i,
+      /\b(send|share|email|whatsapp) (me )?(a )?(photo|picture|copy|scan|pdf) of (your |the )?(trade )?(licen[cs]e|registration|certificate|document|id|emirates id)\b/i,
+      /\b(prove (it|you'?re real) by sending|need to see (the )?(trade licen[cs]e|registration|paperwork))\b/i,
+      /\b((your|the) (registered )?(office )?address|where is (your |the )?office|physical address|head office address)\b/i,
+      /\bwho( is|'s| are)? the (founder|ceo|owner|director)\b/i,
+      /\b(founder'?s? (name|details)|owner'?s? (name|id))\b/i,
+      /\b(your bank (account|details)|company bank|tutorii'?s? bank)\b/i
+    ],
+    promptInjection:
+      `The user is asking for company documents, credentials, registration numbers, founder details, addresses, or bank information.
+HARD RULE — NEVER share any of the following over WhatsApp:
+- Trade licence (number or photo)
+- Company registration number, VAT/tax number, MOA/AOA, chamber of commerce certificate
+- Founder names, owner names, employee names, Emirates IDs, passport copies
+- Office address or any physical address
+- Company bank account details
+- Any photo or scan of an official document
+
+Politely but firmly redirect:
+- Acknowledge: "Totally get wanting to verify — and honestly, you're right not to trust documents sent over WhatsApp. They're easy to fake."
+- Explain why we don't share: "We don't send registration documents, licence numbers, or any official paperwork over WhatsApp. It's not a secure channel and any document I sent could be edited or misused."
+- Give them the right route: "The right way to verify is to email support@tutorii.com from your own email — they'll respond directly with whatever verification you need. You can also look up Tutorii on the UAE Ministry of Economy public registry if you want to check the registration yourself."
+- Reinforce the website: "And www.tutorii.com is the public face of the business — courses, pricing, support contact, all there to look at."
+- End: "I won't send those details here, but the email route is open whenever you want."
+
+Do NOT invent registration numbers, licence numbers, addresses, or names. Do NOT promise that "the team" or "support" will WhatsApp them documents. The only legitimate channel is email to support@tutorii.com.`
+  },
+
+  {
+    name: "trust_verification",
+    patterns: [
+      /\b(how do i know (you|this) (is|are) (real|legit|genuine|trustworthy))\b/i,
+      /\b(are you (real|legit|legitimate|genuine|a real (company|person)))\b/i,
+      /\b(this (sounds|seems|looks) (suspicious|sus|sketchy|dodgy|fishy))\b/i,
+      /\b(prove (it|this is real)|show me (proof|trade licen[cs]e|registration|some proof))\b/i,
+      /\b(trade licen[cs]e|company registration|registered (company|business)|cbuae)\b/i,
+      /\b(is this a (real )?(company|business)|are you a (real|registered) (company|business))\b/i,
+      /\b(linked\s*in|google reviews|trustpilot|reviews)\b/i,
+      /\b(who (are you|is behind this|runs this|founded this))\b/i
+    ],
+    promptInjection:
+      `The user is sceptical and wants verification — totally fair given how many WhatsApp scams hit UAE residents. Be direct and concrete:
+- Acknowledge: "Completely fair question — there's a lot of dodgy stuff on WhatsApp, you're right to check."
+- Concrete proof points: Tutorii is a registered UAE business. Payments handled by MamoPay (CBUAE-licensed — that's the Central Bank of UAE).
+- The product is publicly verifiable: www.tutorii.com — they can browse it, see the courses, see the pricing, see the support contact (support@tutorii.com).
+- For human verification: support@tutorii.com is staffed Sun-Thu 9-6 GST. Anyone can email and get a real response within 24 hours.
+- Don't oversell — acknowledge that ultimately they need to make their own judgement after looking.
+- End with: "Have a proper look at www.tutorii.com and email support if you want extra reassurance. No pressure either way."
+
+CRITICAL — DO NOT SHARE OVER WHATSAPP UNDER ANY CIRCUMSTANCES:
+- Trade licence number or photo of trade licence
+- Company registration number, VAT number, MOE/DED registration documents
+- Founder names, employee names, office address, bank account details
+- Any photo of an official document
+- Promises that "the team will send the trade licence" — they will not.
+If asked specifically for any of these, redirect firmly: "Those documents aren't shared over WhatsApp — it's not a secure channel for that kind of information. The right route is email support@tutorii.com from your verified email address; they'll respond directly with whatever you need to verify us." Do not make up any registration numbers, licence numbers, or company details. If you don't know a fact, say so and direct them to support.`
+  },
+  {
+    name: "want_phone_call",
+    patterns: [
+      /\b(can (i|we) (talk|speak|call|jump on a call|hop on a call))\b/i,
+      /\b(phone (call|number)|call you|call me|speak (to|with) (someone|a (person|human|manager)))\b/i,
+      /\b(zoom|google meet|teams|video call)\b/i,
+      /\b(in person|meet up|meet in person|face to face)\b/i
+    ],
+    promptInjection:
+      `The user wants to speak to a human. Be honest and offer the right channels:
+- Acknowledge: "Totally understand wanting to speak to someone real."
+- Be transparent: I (David) work over WhatsApp, but human support is at support@tutorii.com, Sun-Thu 9-6 GST. They respond within 24 hours.
+- Offer the website as a self-service trust check: www.tutorii.com has the support contact, the FAQ, everything.
+- Don't promise a phone call you can't deliver — keep it honest.
+- End with: "Email support if you want to chat with someone, or just have a look at the platform first — whatever feels right."`
+  },
+  {
+    name: "recruiter_motive",
+    patterns: [
+      /\b(what'?s in it for you|why are you (recruiting|messaging|reaching out to|contacting) me)\b/i,
+      /\b(do you (get paid|earn) (for|from|on) this|are you on commission)\b/i,
+      /\b(why me( specifically)?|why did you pick me)\b/i,
+      /\b(are you (also )?an agent|are you (selling|pitching) me)\b/i
+    ],
+    promptInjection:
+      `The user wants to understand your motive. Be transparent:
+- Be honest: "I'm part of the Tutorii team, building out our agent network. Recruiting agents is my role."
+- Reassure on conflict of interest: "There's no upline/downline — I don't earn off your performance. My job is just to find good agents."
+- Address "why me": "I shortlisted your CV from GulfTalent because your background fits. We're being selective rather than spamming everyone."
+- Keep it short and matter-of-fact. Honesty here builds more trust than spin.`
+  },
+  {
+    name: "why_high_commission",
+    patterns: [
+      /\b(why (is|are) (the )?commission(s)? so high|why 40%|why such (a )?high commission)\b/i,
+      /\b(too good to be true|sounds too good|that'?s (a lot|too much))\b/i,
+      /\b(what'?s the catch|where'?s the catch|there must be a catch)\b/i,
+      /\b(how (can|do) (you|they) (afford|pay) (40%|that much))\b/i
+    ],
+    promptInjection:
+      `The user thinks the commission sounds suspiciously high. Give them the genuine business reason:
+- Acknowledge: "Fair scepticism."
+- The real answer: traditional customer acquisition (Google ads, Meta ads, influencer marketing) costs roughly the same or more per subscriber. Tutorii pays the budget directly to agents instead. It's performance-based marketing — you only get paid when subscribers actually pay.
+- Compare: "Most affiliate programmes pay 5-15% one-off. Tutorii pays 40% recurring because they want serious agents who'll bring quality subscribers, not one-shot referrals."
+- End: "It's a smart marketing model, not too good to be true."`
+  },
+  // ============================================================
+  //   VISA & EMPLOYMENT (UAE-specific concerns)
+  // ============================================================
+  {
+    name: "visa_concern",
+    patterns: [
+      /\b(visa|residency|residence|sponsor(ed|ship)?|emirates id|labour card)\b/i,
+      /\b(work permit|work visa|tourist visa|visit visa|free zone)\b/i,
+      /\b(am i allowed|is this allowed|legal for me)\b/i
+    ],
+    promptInjection:
+      `The user is worried about visa implications — a major concern for every UAE expat. Be confidently reassuring:
+- The agent role is INDEPENDENT income, not employment. You're not being hired, no work visa needed, no labour card change.
+- Reassure clearly: "It's just a referral commission — same as if a bank paid you for referring a friend. No visa implications at all."
+- Normalise it: "Plenty of expats earn referral income — banks, gyms, real estate agents. It's standard."
+- End with: "You're absolutely good to do this."`
+  },
+  {
+    name: "employer_concern",
+    patterns: [
+      /\b(my (employer|boss|company|work) (find out|know|allow))\b/i,
+      /\b(will (anyone|tutorii|you) (tell|inform|notify) my (employer|boss|company))\b/i,
+      /\b(can i do this (alongside|while|with) my (job|work))\b/i,
+      /\b(am i allowed to (do this|earn|have side income))\b/i
+    ],
+    promptInjection:
+      `The user is worried about their employer finding out. Be confident and reassuring — this is fine:
+- Tutorii doesn't disclose your involvement to anyone — your participation is completely private.
+- Reassure clearly: "Yes, this is absolutely fine. It's a personal referral activity in your own time, on your personal phone — completely separate from your day job."
+- Normalise it: "Most expats do similar things — referring banks, gyms, real estate agents, etc. — it's standard."
+- No work needed during work hours: "You can share your link whenever suits you — evenings, weekends, lunch breaks, however you want."
+- End confidently: "You're good to go."`
+  },
+  {
+    name: "trade_license",
+    patterns: [
+      /\b(trade licen[cs]e|do i need a licen[cs]e|business licen[cs]e|freelance permit)\b/i,
+      /\b(register (a |my )?(business|company)|self.?employed|sole proprietor)\b/i
+    ],
+    promptInjection:
+      `The user is asking about trade licenses or business registration. Be clear:
+- "No trade licence needed. You're an independent referrer, not running a business."
+- Reassure: "You're not selling products, holding inventory, or invoicing customers. Tutorii handles all of that. You just share a link."
+- Compare: "Same as referring a friend to your bank or your gym for a bonus — no business setup required."
+- For tax: "Tax reporting depends on your country of residence. Tutorii doesn't withhold — you handle that side per local rules. Worth checking with an accountant if your earnings get significant."
+- Keep it simple. Most agents won't earn at a level that triggers any of this in year one.`
+  },
+  // ============================================================
+  //   SELF-DOUBT (the silent killer of conversion)
+  // ============================================================
+  {
+    name: "not_a_salesperson",
+    patterns: [
+      /\b(i'?m not (a )?(sales(person)?|good at (sales|selling))|not my (thing|strength))\b/i,
+      /\b(i'?m (shy|introvert(ed)?|quiet|awkward|not outgoing|bad at talking))\b/i,
+      /\b(i hate (selling|sales|cold (calling|messaging)))\b/i,
+      /\b(i don'?t want to (sell|pitch|push|convince))\b/i
+    ],
+    promptInjection:
+      `The user thinks they're not cut out for sales. This is the #1 silent killer — handle it gently:
+- Reframe: "You don't have to sell. You share a link, and the platform sells itself."
+- Validate: "Honestly, our best agents aren't pushy salespeople — they're regular people who use the platform and share what they find useful."
+- Practical example: "Some agents just post once on their Instagram or share in a parent group. No 'pitching' required."
+- The handbook covers everything: "You'll get a sales script handbook so you don't have to figure out what to say. Just copy, paste, send."
+- End: "If you can send a WhatsApp message, you can do this."`
+  },
+  {
+    name: "no_network",
+    patterns: [
+      /\b(i don'?t (have|know) (many|a lot of|enough) (people|contacts|friends))\b/i,
+      /\b(i don'?t know (who|anyone) (to (refer|share|tell)))\b/i,
+      /\b(small network|small (circle|group) of friends|don'?t have (a network|connections))\b/i,
+      /\b(i'?m (new|fairly new|just (moved|arrived)) (here|to the uae|in dubai))\b/i
+    ],
+    promptInjection:
+      `The user doesn't think they have enough contacts. Reframe and reduce the bar:
+- Reframe the bar: "You don't need hundreds. Even 5 referrals = AED 190/month recurring. Most people can find 5."
+- Reframe contacts: "You probably know more people than you think — colleagues, neighbours, building groups, parent groups, nationality WhatsApp groups, social media followers."
+- Beyond personal contacts: "You can also share on social media, Facebook groups for expats, or just post your link on your status. Many agents grow that way."
+- Quality over quantity: "5 active subscribers paying you monthly is better than 100 contacts who never convert."
+- End: "Worth giving it a try — the account is free either way."`
+  },
+  {
+    name: "spam_friends_fear",
+    patterns: [
+      /\b(i don'?t want to (spam|annoy|bother) (my )?(friends|family|contacts|people))\b/i,
+      /\b(my friends will (think|hate|be annoyed))\b/i,
+      /\b(spam(ming)?|come across as desperate|look pushy|feel weird)\b/i,
+      /\b(don'?t want to (be|look like|sound like) (a salesperson|pushy|that person))\b/i
+    ],
+    promptInjection:
+      `The user doesn't want to spam their friends. Validate and reframe:
+- Validate: "Completely fair — nobody likes that 'hi how are you long time no speak by the way buy this' message."
+- Reframe sharing: "You're not selling them a product, you're sharing useful courses about life in the UAE — workers rights, visa info, financial planning. That's genuinely helpful content."
+- Suggest a soft approach: "Most agents just share their link once on social media or in a group, no DMs. People who want it click. People who don't ignore it. No spam, no awkwardness."
+- Quality framing: "The good agents aren't the ones who blast everyone — they're the ones who share thoughtfully with people who'd actually benefit."
+- End: "You stay in control of how you share. The handbook gives you scripts that don't feel salesy."`
+  },
+  // ============================================================
+  //   COMPARISON / PAST FAILURES
+  // ============================================================
+  {
+    name: "tried_similar_before",
+    patterns: [
+      /\b(i (tried|did) (something|stuff) (like this|similar) before)\b/i,
+      /\b(i'?m (already|currently) (doing|in) (a|an|another)? ?(affiliate|referral|mlm))\b/i,
+      /\b(amway|herbalife|forever living|tupperware|nu skin|young living|isagenix|monat)\b/i,
+      /\b(it didn'?t work|didn'?t make any money|burned (out|me) before)\b/i
+    ],
+    promptInjection:
+      `The user has been burned before or is comparing to MLM. Acknowledge and differentiate:
+- Validate: "Totally understand — most affiliate or MLM stuff out there is rubbish."
+- Differentiate honestly:
+  • Only 2 commission levels (not infinite downline)
+  • No joining fee, no monthly cost, no inventory to buy
+  • The product is real and genuinely useful (courses for expats)
+  • Subscribers stay because the content has value (not because they're pressured)
+- Compare: "If you've done MLM, you know the issue — recruiting your friends to recruit their friends. We're not that. Subscribers are paying for a real service. You just earn a slice for bringing them in."
+- Coexistence: "Plenty of agents do this alongside other side hustles. It's flexible — give it a month and see if it fits."
+- End with low pressure: "Account is free either way."`
+  },
+  // ============================================================
+  //   LOGISTICS
+  // ============================================================
+  {
+    name: "leaving_uae",
+    patterns: [
+      /\b(i'?m (leaving|moving|going back|relocating) (the )?(uae|dubai|abu dhabi|sharjah|gulf))\b/i,
+      /\b(going back (home|to) ?\w*|moving back|repatriating)\b/i,
+      /\b(only (here|in (the )?uae) (for|until|temporarily))\b/i,
+      /\b(my visa (expires|ends|is (expiring|ending))|visa (cancelled|cancellation|coming to an end))\b/i
+    ],
+    promptInjection:
+      `The user is leaving or has limited time in the UAE. Reassure — this isn't a blocker:
+- "Not a problem at all. The agent role works worldwide — you don't need to be in the UAE."
+- Payouts: "Payouts go to any IBAN globally — UAE, India, Philippines, Pakistan, UK, anywhere."
+- Subscribers: "Your referrals don't have to be in the UAE either, though most expat-focused content appeals more to people in the Gulf."
+- Reassure on continuity: "Your account stays active wherever you are. Commission keeps coming as long as your referrals stay subscribed."
+- End: "Wherever you end up, the income follows."`
+  },
+  {
+    name: "international_banking",
+    patterns: [
+      /\b(can i (use|have) (an? )?(indian|filipino|pakistani|bangladeshi|nepali|sri lankan|egyptian|jordanian|british|uk|us|american|european) (bank|account|iban))\b/i,
+      /\b(my bank is in|i bank with|account in (india|philippines|pakistan|bangladesh|nepal|sri lanka|egypt|jordan|uk|england|usa|us|europe))\b/i,
+      /\b(international (bank|transfer|iban)|foreign (bank|iban|account))\b/i,
+      /\b(non.?uae (bank|iban|account))\b/i
+    ],
+    promptInjection:
+      `The user is asking about international banking. Reassure clearly:
+- "Yes — payouts work to any IBAN globally. UAE, India, Philippines, Pakistan, anywhere."
+- Honest caveat: "Your bank may charge a small incoming transfer fee depending on your account — check that with them. Tutorii doesn't charge anything."
+- Speed: "Transfers usually arrive within 1-5 business days from when MamoPay releases the funds, depending on your bank."
+- Practical tip: "If you have a UAE account too, that's usually the cheapest. But not required."
+- End: "Just enter whichever IBAN you want when you set up your account."`
+  },
+  // ============================================================
+  //   POST-SETUP SUPPORT
+  // ============================================================
+  {
+    name: "didnt_receive_email",
+    patterns: [
+      /\b(i (haven'?t|did(n'?t)? ?) (got|gotten|received|seen) (the |an |any )?(email|welcome (email|message)|login))\b/i,
+      /\b(no email yet|email hasn'?t (arrived|come))\b/i,
+      /\b(where('?s| is) (the |my )?email|nothing in my inbox)\b/i
+    ],
+    promptInjection:
+      `The user hasn't received their welcome email. Practical troubleshooting:
+- First step: "Check your spam/junk folder — sometimes the welcome email lands there."
+- Second step: "Double-check the email address you gave me — was it spelled correctly?"
+- If they confirm spelling: "Let me flag this with the team — usually accounts go live within a few minutes but occasionally there's a delay. If nothing's there in 15-20 minutes, email support@tutorii.com directly and they'll sort it."
+- Be apologetic but not over the top: "Sorry for the wait — should be sorted quickly."
+- Keep tone calm and practical, not panicked.`
+  },
+  // ============================================================
+  //   INCOME STABILITY (the #1 unaddressed concern)
+  // ============================================================
+  {
+    name: "commission_continuity",
+    patterns: [
+      /\b(if (my )?(referrals?|subscribers?|they) cancel|what (if|happens) (if )?(my )?(referrals?|subscribers?) (cancel|stop|leave|quit))\b/i,
+      /\b(do i (still |keep )?(get|earn|receive) (paid|commission|money)|will (the )?commission (still )?(come|continue|keep coming))\b/i,
+      /\b(if i (stop|quit|don'?t (refer|do) anything|am inactive|stop being active))\b/i,
+      /\b(do i lose (my )?(commission|earnings|income)|are commissions guaranteed)\b/i
+    ],
+    promptInjection:
+      `The user is asking about income stability — what happens if referrals cancel or they go inactive. Be honest and reassuring:
+- If a subscriber cancels: "You earn commission for as long as they stay subscribed. If they cancel, that monthly commission stops — but commissions you've already earned and been paid are yours."
+- If the agent goes inactive: "Your existing referrals keep paying you as long as THEY stay subscribed. You don't have to be active to keep earning from people you've already brought in."
+- Stickiness reality: "Most subscribers stay because the platform is genuinely useful — workers rights, visa info, financial planning is content people come back to."
+- Honest framing: "It's like a subscription business — recurring while it lasts. Some referrals stick for years, some for months. Mix is normal."
+- End: "The good news is once you've referred someone, you don't have to do anything else to keep earning from them."`
+  },
+  {
+    name: "realistic_earnings",
+    patterns: [
+      /\b(what do (most|average|typical|real) agents (actually )?(earn|make))\b/i,
+      /\b(realistic(ally)?|honestly|genuinely).*\b(earn|make|income|money)\b/i,
+      /\b(average (income|earnings|commission)|median agent)\b/i,
+      /\b(is (this|that) realistic|are those numbers real)\b/i
+    ],
+    promptInjection:
+      `The user wants honest, realistic earning numbers — not the best-case scenario. Be straight with them:
+- Honest range: "Most active agents land between AED 100-500/month within their first 3 months. Top agents do AED 1,500-3,000+/month after 6 months."
+- Be transparent: "Some agents try for a couple of weeks, get 0-2 referrals, and stop. Others share thoughtfully and steadily build to 20-30 active subscribers."
+- Anchor to effort: "Like anything, output depends on input. Sharing your link with 5-10 thoughtful people in week one usually gets 1-3 subscribers."
+- The compounding angle: "What makes it interesting is the recurring — even AED 200/month is AED 2,400/year doing nothing extra after the initial sharing."
+- Don't oversell: "I won't promise you'll earn AED 5,000/month. But AED 200-500/month from 5-15 referrals is genuinely achievable for most people."`
+  },
+  // ============================================================
+  //   PROFESSIONAL REPUTATION (GulfTalent users skew senior)
+  // ============================================================
+  {
+    name: "professional_reputation",
+    patterns: [
+      /\b(my (professional )?(reputation|image|brand|standing))\b/i,
+      /\b(look(s)? (bad|unprofessional|cheap|tacky|desperate))\b/i,
+      /\b(linked\s*in (presence|profile|connections|network))\b/i,
+      /\b(senior (role|position|manager|executive)|i'?m a (manager|director|executive|senior))\b/i,
+      /\b(my colleagues will (think|judge))\b/i
+    ],
+    promptInjection:
+      `The user is worried about professional reputation. Address it head-on:
+- Validate: "Fair concern — especially if you're in a senior role. How you present this matters."
+- Reframe: "Plenty of agents are senior professionals. They share quietly with their personal network — friends, family, neighbours — not on LinkedIn or with colleagues."
+- Discretion is the default: "You decide where and how you share. Many agents never post publicly — they just message a few people directly."
+- The product helps: "If you do share, you're sharing useful courses about UAE life, workers rights, financial planning. That's positioning yourself as someone who shares value, not someone hawking a product."
+- End: "Your reputation stays in your control. There's no requirement to broadcast anything."`
+  },
+  // ============================================================
+  //   POST-SETUP SUPPORT (where agents quietly drop off)
+  // ============================================================
+  {
+    name: "find_referral_link",
+    patterns: [
+      /\b(where('?s| is) (my |the )?(referral )?link)\b/i,
+      /\b(can'?t find (my )?(referral )?link)\b/i,
+      /\b(how (do i|to) (get|find|copy|share) (my )?(referral )?link)\b/i,
+      /\b(what'?s my (referral )?link)\b/i
+    ],
+    promptInjection:
+      `The user has logged in and can't find their referral link. Be a clear concierge:
+- Walk them through: "Once logged in, look at the left sidebar for 'Referrals' or 'Earnings'. Your unique link is right at the top."
+- Copy it: "There's a 'Copy Link' button next to it — tap that and the link goes to your clipboard."
+- How to share: "From there, paste it into WhatsApp, Instagram bio, social posts — wherever you want to share."
+- If they're stuck: "If you can't find it, screenshot what you see and I can help. Or email support@tutorii.com — they can walk you through screen-by-screen."
+- Encourage first action: "Once you have the link, the easiest first step is to share it once on your status or in one group you're already in."`
+  },
+  {
+    name: "first_payout_timing",
+    patterns: [
+      /\b(when (will i|do i|am i going to) (get (paid|my|first)|see (my )?(first |any )?(payout|money|commission)))\b/i,
+      /\b(how long (until|before|till) (i (get|earn|see)|first payout))\b/i,
+      /\b(first payout|first payment|first commission)\b/i,
+      /\b(minimum (payout|payment)|payout threshold)\b/i
+    ],
+    promptInjection:
+      `The user wants to understand payout timing. Be specific:
+- The threshold: "Minimum payout is AED 50 — that's about 2 active subscribers."
+- The schedule: "Payouts happen every Tuesday at 9AM Dubai time. Once you cross AED 50, the full amount transfers to your bank that Tuesday."
+- Realistic timeline: "If you sign up 2-3 subscribers in your first week, you'll typically hit your first payout within 2-3 weeks."
+- Transfer time: "Money usually arrives within 1-5 business days from when MamoPay releases the funds, depending on your bank."
+- Below threshold: "If you're below AED 50, your earnings roll over to the next week until you hit the threshold."
+- End: "Most agents see their first payout within 3-4 weeks of signing up."`
+  },
+  {
+    name: "inactive_account",
+    patterns: [
+      /\b(if i (don'?t|do not) (refer|share|recruit|do anything|use it))\b/i,
+      /\b(will (you|tutorii) (close|delete|deactivate|cancel) my account)\b/i,
+      /\b(activity requirement|minimum activity|do i have to be active)\b/i,
+      /\b(can i take (a |some )?(break|time off))\b/i
+    ],
+    promptInjection:
+      `The user wants to know what happens if they're inactive. Reassure:
+- "No activity requirement. Your account stays free and active whether you refer one person or zero."
+- Existing income continues: "If you've already brought in subscribers, those commissions keep coming as long as those people stay subscribed — even if you do nothing."
+- Take breaks freely: "Plenty of agents go quiet for months and then come back to share again. The link doesn't expire."
+- Honest framing: "The only thing that stops is new commissions. Existing recurring commissions from past referrals keep flowing."
+- End: "There's literally no downside to having the account. Set it up, share when you have time, take breaks whenever you want."`
+  },
+  // ============================================================
+  //   SCOPE / ELIGIBILITY
+  // ============================================================
+  {
+    name: "referring_family",
+    patterns: [
+      /\b(can i refer (my )?(family|spouse|wife|husband|partner|kids|children|parents|brother|sister|cousin))\b/i,
+      /\b(does (family|spouse|wife|husband) count)\b/i,
+      /\b(refer myself|self.?refer)\b/i
+    ],
+    promptInjection:
+      `The user wants to know if family / self-referrals count. Be clear:
+- Family is fine: "Yes — you can refer family members, friends, anyone. Tutorii doesn't restrict who counts as a referral."
+- Self-referral isn't allowed: "You can't refer yourself though (creating a second account just to claim commission). That kind of thing gets flagged and the account suspended."
+- Practical scenario: "Many agents start by signing up their spouse, parents, siblings — people who'd genuinely use the courses. Totally fine."
+- Honest reminder: "Just make sure they actually want the platform — not just signing up for your sake. Subscribers who don't engage tend to cancel quickly."`
+  },
+  // ============================================================
+  //   PRODUCT CREDIBILITY
+  // ============================================================
+  {
+    name: "content_quality",
+    patterns: [
+      /\b(is (the )?content (any )?good|are the courses (any )?good)\b/i,
+      /\b(quality of (the )?(content|courses?|lessons|videos?))\b/i,
+      /\b(who (made|created|teaches|wrote) (the )?(content|courses?))\b/i,
+      /\b(worth (paying |the )?(aed )?95)\b/i,
+      /\b(can i (preview|see (a )?sample)|sample (course|lesson))\b/i
+    ],
+    promptInjection:
+      `The user wants to assess if the content is actually worth paying for. Be substantive:
+- Content scope: "5 modules, 20 lessons covering UAE life, workers rights, job search, financial literacy, entrepreneurship. Each lesson 8-25 minutes with video and PDFs."
+- Why it sticks: "The workers rights and visa rules content is what subscribers find most useful — it's information that's hard to find clearly anywhere else for expats."
+- Built-in AI tutor: "There's also a 24/7 AI tutor inside the platform — subscribers ask questions and get answers tailored to their situation."
+- Direct verification: "Best way to judge: have a look at www.tutorii.com — the curriculum page has every module and lesson listed."
+- For agents specifically: "Once your free account is live, you'll have access to all of it. You'll see exactly what subscribers are getting."
+- Honest framing: "Content quality is what makes subscribers stay — and that's what makes your commission recurring rather than one-off."`
   }
 ]
 
@@ -332,178 +896,133 @@ const OBJECTION_HANDLERS = [
 // ---------------------------------------------------------------------------
 
 const FALLBACK_REPLIES = {
-  // --- INITIAL: 70/30 earning/education | endings: mixed ---
+  // --- INITIAL: Strong hooks, exclusivity, curiosity ---
   [STAGES.INITIAL]: [
-    // Questions (3)
-    "Good to hear from you! Quick question — are you open to earning something on the side?",
-    "Good to hear from you! I reached out because I think you'd be a great fit for something that pays well. Are you based in the UAE?",
-    "Thanks for replying. Would an extra income stream interest you at all?",
-    // Soft prompts (2)
-    "Appreciate the reply! Let me know if you're open to hearing about a side income opportunity.",
-    "Thanks for getting back to me. Happy to explain what I'm working with whenever you have a minute.",
-    // Assumptive (1)
-    "Good to hear from you! I'll give you the quick version — it'll take 2 minutes.",
-    // Curiosity (1)
-    "Appreciate the response! I'm working with something that pays 40% recurring commission. Not what most people expect."
+    "Good to hear from you! I came across your CV on GulfTalent — your profile stood out. We're shortlisting people for a free agent role with 40% recurring commission. Open to hearing more?",
+    "Thanks for replying! Quick context: I shortlisted your CV from GulfTalent for a sales agent role with Tutorii. Free to join, 40% commission, paid weekly. Worth 2 minutes to explain?",
+    "Appreciate the reply! I think you'd be a strong fit based on your background. We give you a free agent account and you earn 40% on every subscriber you bring in. Interested?",
+    "Good to hear from you! Your GulfTalent profile caught my eye. I'm building out our agent team — free account, weekly payouts, no cost to you. Want me to walk you through it?",
+    "Thanks for getting back to me. I'm offering a free sales agent role — you earn 40% recurring commission on every subscriber. Realistic agents make AED 200–950/month. Want the quick breakdown?",
+    "Appreciate the response. To be clear: this isn't a job, it's a flexible earning role. Free account, 40% commission, work on your own schedule. Worth hearing about?",
+    "Good to hear from you! I'll keep this short — free agent account, 40% commission, weekly bank payouts, full sales training included. Can I send you the details?"
   ],
-  // --- INTERESTED: 70/30 earning/education | endings: mixed ---
+  // --- INTERESTED: Detailed pitch with concrete numbers + use website as trust-builder ---
   [STAGES.INTERESTED]: [
-    // Questions (4)
-    "So here's the short version — Tutorii pays you 40% monthly commission for every person you refer. Paid weekly to your bank. Want me to explain how?",
-    "It's called Tutorii. You earn 40% commission on every referral — recurring, every month. 3 referrals and the whole thing pays for itself. Interested?",
-    "Quick version: 40% monthly commission, paid every Tuesday to your bank. No cap on what you can earn. Want me to explain the setup?",
-    "So the earning side is 40% monthly commission, paid weekly. And the product itself is an education platform for expats — courses, AI tutor, the works. Makes it easy to refer because people actually use it. Worth a look?",
-    // Soft prompts (3)
-    "Basically it's a way to earn recurring passive income. You share a link, and every time someone subscribes you get 40% every month. No selling, no inventory. Let me know if you want the full breakdown.",
-    "Here's the deal — you share a link, people subscribe, you earn 40% of every payment they make. Monthly. Recurring. Happy to walk you through it.",
-    "Tutorii pays 40% commission and it's backed by a real product — courses for expats on things like workers rights, visa rules, career skills. That's what makes it easy to share. I can explain the numbers if you're interested.",
-    // Assumptive (2)
-    "The model is simple — AED 95/month subscription, and you earn AED 38 for every person you bring in, every single month they stay. I'll show you how the math works.",
-    "Think of it as a side income that builds over time. 40% commission on every referral, paid weekly to your bank. I'll break down the numbers for you.",
-    // Curiosity (1)
-    "It's a 40% recurring commission on a platform called Tutorii. The platform has actual courses people in the UAE find useful, so it basically sells itself. The math is pretty interesting once you see it."
+    "Here's how it works: Tutorii is an education platform for expats. Subscribers pay AED 95/month — have a look: www.tutorii.com. As an agent, you get the same platform free, plus AED 38/month for every subscriber you bring in. Want to see the numbers?",
+    "Quick version: have a look at www.tutorii.com — that's what your future subscribers will see and pay AED 95/month for. You get it free as an agent and earn 40% on every subscription. Practical example — 10 subscribers = AED 380/month recurring. Sound good?",
+    "It's straightforward — Tutorii sells subscriptions at AED 95/month (check the site: www.tutorii.com). You get free access as an agent and earn AED 38/month for every subscriber you bring in. Plus AED 4.75/month on their referrals. Want me to set you up?",
+    "The model: subscribers pay AED 95/month for the courses, AI tutor, and support (see www.tutorii.com). As an agent you get all that free, plus 40% commission on every subscription you bring in. The product is genuinely useful so subscribers stay — that's recurring income for you. Ready to start?",
+    "Here's the maths — subscribers pay AED 95/month, you earn AED 38 of that. 5 subscribers = AED 190/month. 10 = AED 380. 25 = AED 950. Have a look at www.tutorii.com so you know what you'll be selling. Want me to get you set up?",
+    "Free account, free training materials, free sales handbook — no cost to you, ever. The platform itself is at www.tutorii.com (that's what subscribers pay for). Most agents start by sharing their link with 5–10 people they know. Want me to get you set up?",
+    "Here's the deal — go to www.tutorii.com and have a look. That's the product your subscribers will pay AED 95/month for. You get the same access as an agent (free), plus you earn 40% commission on every subscription. Ready?",
+    "The setup is simple: you get a free agent account on www.tutorii.com — same platform paying subscribers use. You share your referral link, people subscribe, you earn AED 38/month per person. Paid every Tuesday to your bank. Want to get started?",
+    "Tutorii pays one of the highest commission rates in the industry — 40% recurring. Most affiliate programmes pay 5–15%. Have a look at the platform itself (www.tutorii.com) — when you see the product you'll understand why it sells.",
+    "Think of it this way — your future subscribers are the people who go to www.tutorii.com and click 'Subscribe.' You earn AED 38/month every time. Top agents are at AED 2,000+/month. Want me to set up your free account?"
   ],
-  // --- QUALIFIED: 60/40 earning/education | endings: heavier on assumptive ---
+  // --- QUALIFIED: Ask for EMAIL specifically (this is the conversion gate) ---
   [STAGES.QUALIFIED]: [
-    // Questions (2)
-    "Ready to take a look? I'll send the link now — the earning breakdown is all inside.",
-    "Want me to send the link? You'll see the earning setup plus the courses — workers rights, finance, career skills. The whole thing.",
-    // Soft prompts (2)
-    "Let me know when you're ready and I'll send the link. The referral dashboard makes the whole thing really clear.",
-    "Let me send the link — you'll see the earning side and the courses. People stick around because the content is genuinely useful, which means your commissions keep coming. Just say the word.",
-    // Assumptive (5)
-    "Let me send you the link so you can see the earning dashboard for yourself.",
-    "I'll drop you the link now. You'll see exactly how the referral side works once you open it.",
-    "Let me send the link — you can check out the commission structure and see real numbers.",
-    "I'll send it over now. The platform has the referral dashboard plus proper courses with an AI tutor built in — that's what makes people actually stay subscribed.",
-    "Let me drop you the link. Once you open it you'll see both the commission setup and the courses — workers rights, visa rules, all useful stuff for expats.",
-    // Curiosity (1)
-    "Easiest thing is to just see it. The dashboard lays out the commission structure better than I can over text."
+    "Brilliant! What's the best email address to set up your free agent account with?",
+    "Great choice — let's get you set up. What email address should I use to create your account?",
+    "Perfect. I just need your email address and I'll get your free account created within a few minutes. What's the best one to use?",
+    "Let's do this. Send me the email address you want me to register your account with — I'll have it set up shortly.",
+    "Excellent. What email should I set your account up under? Once I have that, you'll be ready to go within a few minutes.",
+    "Right, let's get you started. What's the best email address to use for your account? I'll send your login details there.",
+    "Welcome aboard! Just need your email address to set up the account. What's the best one to reach you on?",
+    "Brilliant — let's get you in. What email should I use to create your free agent account?",
+    "Great. Drop me your email address and I'll have your account ready within a few minutes. You'll get login details and your sales script handbook there.",
+    "Perfect. What email address should I register your account with? Everything will be sent there — login details, handbook, the lot."
   ],
-  // --- LINK_SENT: 60/40 earning/education | endings: heavier on soft prompts ---
+  // --- LINK_SENT (account being set up): Confirm receipt, support onboarding ---
   [STAGES.LINK_SENT]: [
-    // Questions (2)
-    "Did you get a chance to look? The commission tracking is all real-time inside the platform. Any questions?",
-    "Hey, did you open it yet? You'll see the commission structure and the course library. Anything I can help with?",
-    // Soft prompts (4)
-    "Once you open it you'll see how the commissions work. Happy to walk you through anything.",
-    "Take your time with it. The earning breakdown is all in your dashboard once you sign up. I'm here if anything comes up.",
-    "Let me know once you've opened it. You'll see the referral side and the course library — knowing what the product is helps when you share your link.",
-    "Take your time. Once you're in you'll see both the earning dashboard and the content. The courses are what make this sustainable — people stay subscribed because they get real value. Just let me know when you've had a look.",
-    // Assumptive (3)
-    "Once you're in I can show you how people are sharing their link and earning. The setup takes a couple of minutes.",
-    "The dashboard makes it really clear — you'll see your link, your referrals, your earnings all in one place. I'll walk you through it once you're in.",
-    "Have a look when you get a chance. The platform has proper courses and an AI tutor, so people actually stick around. That's good for you because your commission is recurring. I'll guide you through the rest.",
-    // Curiosity (1)
-    "Once you open it the referral dashboard kind of speaks for itself. Most people's first reaction is that the numbers are better than they expected."
+    "Have you received the welcome email yet? It should have your login details and the sales handbook. Let me know once you've reset your password.",
+    "Quick check — did you get the email with your login details and the sales handbook? Don't forget to use 'Forgot Password' to set your own password as soon as you log in.",
+    "Hey, have you had a chance to log in yet? Once you reset your password, you can grab your referral link from the dashboard and start sharing.",
+    "Just checking in — make sure you go to 'Forgot Password' to set your own password (it's important for your security). Then explore the platform a bit so you know what you're sharing.",
+    "Once you're in, the sales handbook walks you through everything — scripts, where to find subscribers, objection handling. I'm here if you have questions.",
+    "Have you read through the handbook yet? It has ready-to-use scripts so you don't have to figure out what to say. Start with people you know — friends, family, colleagues.",
+    "Take your time getting set up. Reset your password first, then have a look at the platform and the handbook. Once you're comfortable, share your link with 5 people to start.",
+    "Just checking in — any luck logging in? Once you've reset your password and grabbed your referral link, even sharing with 5 people gets you started.",
+    "Hey, the handbook covers everything — scripts, objection handlers, where to share your link. Best to read it before you start so you're set up properly.",
+    "Once you log in, change your password (use 'Forgot Password'), set up your IBAN in Settings, and grab your referral link. Then start sharing with people you know. Let me know if you hit any snags."
   ],
-  // --- STALLED: 70/30 earning/education | endings: mixed ---
+  // --- STALLED: Re-engage with stronger hooks ---
   [STAGES.STALLED]: [
-    // Questions (3)
-    "Hey, just checking in. The earning opportunity I mentioned is still open. Worth another look?",
-    "Hey, just a quick check-in. The 40% commission thing is still there if you're interested. Want me to resend the details?",
-    "Hey — quick one. The commission is 40% recurring and the platform has real courses that people use, so churn is low. Good combo for earning. Still interested?",
-    // Soft prompts (4)
-    "Hi again — a few people I onboarded recently are already earning weekly payouts. Thought of you. The door's still open if you want to take a look.",
-    "Hey, no pressure at all — just wanted to circle back. 40% monthly commission, paid to your bank every Tuesday. Let me know if you want to hear more.",
-    "Hi — people I spoke to around the same time as you are already seeing their first payouts. Just wanted to let you know it's still there.",
-    "Hey, just following up. The earning side is strong and the platform itself has useful content for expats, so referrals tend to stay. Let me know if you want another look.",
-    // Assumptive (2)
-    "Hey, still around if you want to pick this up. The earning side is simple and the setup takes a few minutes. I'll send the details.",
-    "Hi again — wanted to check in. People are earning well from Tutorii and the courses keep people subscribed long-term. Means your commissions stick. I'll send the link again if you want.",
-    // Curiosity (1)
-    "Hey, circling back one more time. The platform keeps growing which means more people to earn from. The timing is actually better now than when we first spoke."
+    "Hey, just checking in. The agent role is still open and a few people who joined recently are already getting their first payouts. Want to take another look?",
+    "Hey — quick one. The free agent role with 40% commission is still available. We're filling spots though. Worth another look?",
+    "Hi — wanted to circle back. Agents who joined when I first messaged you are now earning AED 200–500/month. The opportunity is still there if you want it.",
+    "Hey, no pressure — just wanted to mention the agent spots are still open. Free account, 40% commission, weekly payouts. Let me know if you want to hear more.",
+    "Hi — agents I onboarded a few weeks ago are at their second or third payout already. Just wanted to let you know the door's still open.",
+    "Hey, following up on the agent role. Free account, full training, 40% commission. The platform keeps growing which means more subscribers to earn from.",
+    "Hey, still around if you want to pick this up. Setup takes a couple of minutes and the account is free — no risk in just trying it.",
+    "Hi again — wanted to check in. The earning side is strong and we keep adding new agents who are doing well. Want to give it another look?",
+    "Hey, circling back one more time. The timing is actually better now — more people subscribing, which means more commission potential for new agents.",
+    "Hi — quick reminder, free agent account, 40% recurring commission, weekly bank payouts. No cost to you whatsoever. Just say the word and I'll set you up."
   ],
-  // --- WIN_BACK: 60/40 earning/education | endings: mixed ---
+  // --- WIN_BACK: Fresh start, what's changed ---
   [STAGES.WIN_BACK]: [
-    // Questions (3)
-    "Hey! Good to hear from you again. People on Tutorii are earning more than ever — the referral side has really taken off. Want a quick update?",
-    "Hey! Good timing — the referral payouts have been growing week over week. Want to hear what's changed?",
-    "Great to hear from you! Tutorii keeps growing — new courses, more users, bigger commission pool. Want the update?",
-    // Soft prompts (3)
-    "Welcome back! The earning opportunity has grown a lot since we last chatted. Happy to fill you in whenever you're ready.",
-    "Great to hear from you! The earning side is stronger than ever. Let me know if you want the 2-minute update.",
-    "Hey! The platform has grown a lot — new lessons, AI tutor, and the subscriber base keeps climbing. Good news for earning. Just say the word and I'll catch you up.",
-    // Assumptive (3)
-    "Welcome back! More people earning, bigger weekly payouts. I'll give you the quick rundown.",
-    "Great to hear from you! A lot of people have joined recently and the commissions are compounding. Let me catch you up.",
-    "Welcome back! There's new content on careers and finance, and more subscribers means more referral opportunity. I'll fill you in.",
-    // Curiosity (1)
-    "Hey! The platform has added new courses and more people are joining, which means the earning potential is bigger than when we last spoke. The numbers might surprise you."
+    "Hey! Good to hear from you. The agent programme has grown a lot — more subscribers means bigger commission potential. Want a quick update?",
+    "Hey! Good timing — we just added new courses and the subscriber base keeps growing. Big opportunity for new agents. Want to hear more?",
+    "Great to hear from you! Tutorii keeps growing — new content, more subscribers, agents earning more than ever. Want me to catch you up?",
+    "Welcome back! The earning opportunity is bigger than when we last spoke. Happy to fill you in whenever you're ready.",
+    "Great to hear from you! The agent commissions have been growing week over week. Let me know if you want the 2-minute update.",
+    "Hey! The platform has expanded a lot — new courses, more subscribers, stronger commissions for agents. Want to hear what's changed?",
+    "Welcome back! A lot of agents have joined recently and the numbers are encouraging. Let me catch you up on where we are now.",
+    "Great to hear from you! There's new content live and the subscriber base keeps climbing. More earning potential for new agents.",
+    "Welcome back! The agent programme is stronger than ever. Free account, 40% commission, weekly payouts. Want me to set you up?",
+    "Hey! The earning potential is bigger than when we last spoke — more subscribers means more commission for agents. Worth another look?"
   ]
 }
 
-// Stage-specific no-reply follow-ups
-// INITIAL & INTERESTED: 70/30 | QUALIFIED & LINK_SENT: 60/40
-// Endings: ~40% questions, ~30% soft prompts, ~20% assumptive, ~10% curiosity
+// Stage-specific no-reply follow-ups for agent recruitment.
+// Differentiated by ANGLE per stage:
+//   INITIAL: Curiosity hook (they haven't engaged yet — give them a reason to)
+//   INTERESTED: Specific number / social proof (move them off the fence)
+//   QUALIFIED: Direct close — assume the sale (they've shown interest, just need a nudge)
+//   LINK_SENT: Helpful concierge (account is set up — get them activated)
 const NO_REPLY_FOLLOWUPS = {
-  // --- INITIAL: 70/30 ---
+  // --- INITIAL: Curiosity-driven, low-friction. No hard pitch. ---
   [STAGES.INITIAL]: [
-    // Questions (4)
-    "Hey, just circling back. I reached out because I think you could do well with a side income opportunity. 2 minutes to explain — interested?",
-    "Hi again — know WhatsApp messages pile up 😅 Short version: there's a way to earn 40% recurring commission by sharing a link. No selling, no inventory. Want the quick breakdown?",
-    "Hey, just making sure you saw my message. The opportunity is a 40% monthly commission — paid weekly. Worth 2 minutes?",
-    "Hey, just checking in. It's 40% commission on a real education platform — workers rights, career stuff, visa info. Easy to share because people actually need it. Worth a look?",
-    // Soft prompts (3)
-    "Hey, just a quick follow-up. I think the earning side of this could be a great fit for someone with your profile. Let me know if you want to hear more.",
-    "Hey, following up one more time. 40% recurring commission, paid to your bank every Tuesday. Happy to explain if you're interested.",
-    "Hi — circling back. The reason this works well is the product behind it is genuinely useful for expats, so referrals stick. That means recurring income for you. Let me know if you'd like the details.",
-    // Assumptive (2)
-    "Hi — still keen to chat if you are. The earning model is really straightforward and people are doing well with it. I'll send you the quick breakdown.",
-    "Hey, quick follow-up. I genuinely think this could work well for you. I'll keep it to 2 minutes if you're up for it.",
-    // Curiosity (1)
-    "Hi again — the opportunity is earning 40% commission on a platform called Tutorii that has courses for expats in the UAE. The numbers are better than most people expect."
+    "Hey, just circling back on my message about the Tutorii agent role. Thought you'd find the numbers interesting — 40% recurring commission, no cost to join. Worth a quick chat?",
+    "Hi again — I'll keep this brief. The opportunity I mentioned is still open. Free agent account, weekly bank payouts. Curious to hear more?",
+    "Hey, just making sure you saw my earlier message. I shortlisted your CV from GulfTalent for an agent role — free account, 40% commission. Worth 2 minutes?",
+    "Hey, just following up. I think your background fits well with what we're looking for. Free agent role, weekly payouts. Happy to explain if you're curious.",
+    "Hey, quick follow-up — the agent role is still available. Costs nothing to join, pays AED 38/month per subscriber. Worth hearing about?",
+    "Hi — circling back. Free agent account, 40% commission, weekly bank payouts. If now's not a good time, no worries. Just let me know either way.",
+    "Hey, just checking — did my earlier message land? Free agent role, no cost to you, 40% recurring commission. Want me to walk you through it?",
+    "Hi again — agent spots still open if you're interested. The numbers tend to surprise people once they see them. Want a quick breakdown?"
   ],
-  // --- INTERESTED: 70/30 ---
+  // --- INTERESTED: Move-them-off-the-fence with social proof + specifics ---
   [STAGES.INTERESTED]: [
-    // Questions (4)
-    "Hey, did you get a chance to think about the earning side? Want me to walk you through the numbers?",
-    "Just following up — a few people I spoke to this week signed up and are already seeing commissions come in. Want me to send you the link?",
-    "Hey, still interested? The earning setup takes a few minutes and the 40% commission starts immediately. Want me to explain?",
-    "Hi, wanted to mention — the reason the earning works long-term is because the platform has real content people use. Means your referrals don't churn. Want me to explain?",
-    // Soft prompts (3)
-    "Hi, the 40% commission thing I mentioned — it really does add up fast. No rush, but let me know if you want the breakdown.",
-    "Just checking in — the weekly payouts are real and the math is simple. Happy to walk you through it whenever you're ready.",
-    "Hey, the reason it works well is the platform has courses on things like workers rights and visa rules — stuff every expat needs. So referrals stick and your commission keeps coming. Let me know if you want to hear more.",
-    // Assumptive (2)
-    "Hey, people I onboarded around the same time I messaged you are already earning. I'll send you the link so you can see for yourself.",
-    "Just following up — the product behind it is solid (education for expats, AI tutor) which means people stay subscribed. That's what makes the 40% commission sustainable. I'll break down the numbers for you.",
-    // Curiosity (1)
-    "Hi — quick reminder, the commission is 40% recurring. Every referral pays you every month. The compounding effect is what catches most people off guard."
+    "Hey, did you get a chance to think it over? Quick example: an agent who joined when I first messaged you is now at 8 subscribers. AED 304/month recurring.",
+    "Just following up — Priya, an agent in Dubai, recovered her time investment in week one. Want me to get you set up?",
+    "Hey, the agent role is still open. To put numbers to it: 5 subscribers = AED 190/month, 10 subscribers = AED 380/month. All recurring. Want to get started?",
+    "Just checking in — agents who joined a couple of weeks ago are getting their second or third payout already. Want me to set up your account?",
+    "Hey, wanted to mention — every agent gets a sales script handbook so you're not figuring out what to say. Want me to get you set up?",
+    "Hi, the 40% commission really does add up — even 3 referrals/week = AED 114/month within your first month. Want to lock in your account?",
+    "Hey — quick reminder, the account is completely free and the setup takes a few minutes. Want me to get you started?",
+    "Just following up. The agents doing best didn't have any sales experience — they just shared their link with their network. Want me to get you in?"
   ],
-  // --- QUALIFIED: 60/40 ---
+  // --- QUALIFIED: Direct, assumptive. They've shown interest. Ask for email. ---
   [STAGES.QUALIFIED]: [
-    // Questions (2)
-    "Hey, want me to go ahead and send you that link?",
-    "Ready? I'll send the link now. You'll see the earning side and the education side — courses on visa rules, employment rights, all the stuff expats need. Shall I send it?",
-    // Soft prompts (2)
-    "Still keen to take a look? I can drop the link right now — takes 2 mins to see how the commissions work. Just say the word.",
-    "Hey, let me send it over — you'll see the commissions and the content. People stay because the courses are useful, which is good for your recurring income. Let me know when you're ready.",
-    // Assumptive (5)
-    "Just checking — I'll send the signup link over now so you have it.",
-    "Hey, ready to see the numbers? I'll send the link now.",
-    "Want me to send it? Once you're in you'll see exactly how the referral earnings work. Sending it over.",
-    "Hey, I'll send the link now. The commission tracking is all real-time so you can see everything.",
-    "Shall I drop the link? You'll see both the referral dashboard and the course library. Knowing the product helps when you share it. Sending now.",
-    // Curiosity (1)
-    "Hey, the dashboard lays everything out better than I can over text. Once you see the numbers it clicks pretty fast."
+    "Hey, ready to get started? Just send me your email and I'll have your account ready within a few minutes.",
+    "Quick follow-up — what's the best email to set your account up under? I can get it sorted today.",
+    "Hey, still keen? Drop me your email and I'll get the ball rolling.",
+    "Just checking — want me to go ahead and set up your account? Just need your email.",
+    "Hey, ready when you are. Send me your email and I'll have your free account ready by end of day.",
+    "Hi, just need an email address to get you set up. What's the best one to use?",
+    "Hey, the spots are filling up. Want me to lock yours in? Just need your email.",
+    "Quick one — what email should I use for your account? I'll get it created today."
   ],
-  // --- LINK_SENT: 60/40 ---
+  // --- LINK_SENT: Helpful concierge. Account exists — help them activate. ---
   [STAGES.LINK_SENT]: [
-    // Questions (2)
-    "Hey, did you get a chance to open the link I sent? Any questions about how the earning works?",
-    "Hey, did you open it yet? You'll see the commission structure and the course library. Anything I can help with?",
-    // Soft prompts (4)
-    "Just checking in — the link I sent shows exactly how the commissions work. Let me know if you have any questions.",
-    "Hi, any luck with the link? Once you open it the referral dashboard is right there. I'm here if anything comes up.",
-    "Just checking in — the platform has the referral tracking plus real courses on things like employment rights and financial planning. Both sides are worth seeing. Let me know once you've had a look.",
-    "Hi, give the link a look when you can. The courses and AI tutor are what keep people subscribed long-term — that's why the 40% commission is recurring, not one-off. Happy to answer any questions.",
-    // Assumptive (3)
-    "Hey, the link is still active. Takes 2 mins to see how the earning works. I'll walk you through the rest once you've opened it.",
-    "Just following up on the link — once you sign up the commission tracking starts immediately. I'll guide you from there.",
-    "Hey, wanted to check if you opened it. The earning setup is really straightforward once you see the dashboard. I'll be here to help with next steps.",
-    // Curiosity (1)
-    "Hi, the link I sent has everything — the earning dashboard plus the courses. Most people are surprised how clear the commission tracking is once they see it."
+    "Hey, did you get the welcome email with your login details? Make sure you reset your password using 'Forgot Password' — important for your security.",
+    "Hey, just checking — were you able to log in OK? The handbook should be in your inbox too. Let me know if anything's missing.",
+    "Hi, hope the setup went smoothly. Quick reminder: reset your password, add your IBAN in Settings, then grab your referral link. Need any help?",
+    "Just checking in — have you read the handbook yet? It walks you through exactly who to message and what to say. Worth 15 minutes before you start.",
+    "Hey, your link is live and waiting. Even sharing with 5 people you know gets you AED 190/month. Want any tips on where to start?",
+    "Hi, did you see the email with your login? Once you're in, the dashboard makes everything clear. Let me know if you hit any snags.",
+    "Hey — once you're set up, the easiest first move is to share your link in 1-2 WhatsApp groups you're already in. Most agents start there.",
+    "Just checking — any luck logging in? If you didn't get the email, check spam, or let me know and I'll resend."
   ]
 }
 
@@ -518,10 +1037,28 @@ function getGulfHour() {
   return (now.getUTCHours() + GULF_OFFSET_HOURS) % 24
 }
 
+function getGulfDayOfWeek() {
+  // Returns 0 (Sunday) to 6 (Saturday) in Gulf time
+  const now = new Date()
+  // UTC day, then add Gulf offset hours adjustment
+  const gulfMs = now.getTime() + (GULF_OFFSET_HOURS * 60 * 60 * 1000)
+  return new Date(gulfMs).getUTCDay()
+}
+
+function isWeekend() {
+  // UAE weekend is Saturday (6) and Sunday (0).
+  // Note: UAE moved to Sat-Sun weekend in 2022.
+  const day = getGulfDayOfWeek()
+  return day === 0 || day === 6
+}
+
 function isGoodSendWindow() {
+  // Skip weekends entirely for outbound recruitment messages.
+  if (isWeekend()) return false
   const hour = getGulfHour()
-  // Good windows: 9am-1pm and 5pm-9pm Gulf time
-  return (hour >= 9 && hour < 13) || (hour >= 17 && hour < 21)
+  // Good windows: 10am-1pm and 5pm-8pm Gulf time on weekdays
+  // (Avoid early morning and late evening which feel intrusive)
+  return (hour >= 10 && hour < 13) || (hour >= 17 && hour < 20)
 }
 
 function msUntilNextGoodWindow() {
@@ -529,29 +1066,264 @@ function msUntilNextGoodWindow() {
   const gulfHour = getGulfHour()
   const gulfMinute = now.getUTCMinutes()
   const currentMinutes = (gulfHour * 60) + gulfMinute
+  const day = getGulfDayOfWeek()
 
-  // Good windows in minutes from midnight: 540-780 (9am-1pm), 1020-1260 (5pm-9pm)
+  // Good windows in minutes from midnight: 600-780 (10am-1pm), 1020-1200 (5pm-8pm)
   const windows = [
-    { start: 540, end: 780 },
-    { start: 1020, end: 1260 }
+    { start: 600, end: 780 },
+    { start: 1020, end: 1200 }
   ]
 
-  for (const w of windows) {
-    if (currentMinutes < w.start) {
-      return (w.start - currentMinutes) * 60 * 1000
+  // If it's a weekday and we have a window left today, return ms to that window
+  if (day !== 0 && day !== 6) {
+    for (const w of windows) {
+      if (currentMinutes < w.start) {
+        return (w.start - currentMinutes) * 60 * 1000
+      }
     }
   }
 
-  // Past 9pm — next window is 9am tomorrow
-  return ((24 * 60) - currentMinutes + 540) * 60 * 1000
+  // Otherwise, walk forward day-by-day until we hit a weekday at 10am
+  let daysToAdd = 1
+  let nextDay = (day + 1) % 7
+  while (nextDay === 0 || nextDay === 6) {
+    daysToAdd++
+    nextDay = (nextDay + 1) % 7
+  }
+  const minutesToTomorrow10am = (daysToAdd * 24 * 60) - currentMinutes + 600
+  return minutesToTomorrow10am * 60 * 1000
 }
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
+// Verbose per-message detection logs flood production. Off by default;
+// flip DEBUG_DETECTION=1 in env for local debugging.
+const DEBUG_DETECTION = process.env.DEBUG_DETECTION === "1"
+function debugLog(...args) {
+  if (DEBUG_DETECTION) console.log(...args)
+}
+
 function pickRandom(arr) {
   return arr[Math.floor(Math.random() * arr.length)]
+}
+
+// Detects an email address in a free-text message.
+// Used to gate account creation: we only fire the welcome/onboarding
+// message after the user has actually given us an email to set up their account with.
+const EMAIL_REGEX = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/
+
+function extractEmail(message) {
+  const match = String(message || "").match(EMAIL_REGEX)
+  return match ? match[0].toLowerCase() : null
+}
+
+// Detects clear agreement signals — used to advance the stage to QUALIFIED
+// without depending on the LLM to recognise commitment.
+const AGREEMENT_PATTERNS = [
+  /\b(yes|yeah|yep|yup|sure|okay|ok|alright|sounds good)\s*[!.,]?\s*(i'?m in|let'?s do it|set me up|sign me up|count me in|let'?s go|go for it|i'?ll do it|do it)\b/i,
+  /\b(i'?m|im) (in|interested|down|keen|game)\b/i,
+  /\b(let'?s do (it|this)|let'?s go|sign me up|set me up|count me in|where do i sign|how do i (sign up|join|start))\b/i,
+  /\b(yes please|yes definitely|absolutely|definitely interested)\b/i
+]
+
+function detectClearAgreement(message) {
+  const text = String(message || "").trim()
+  if (!text) return false
+  return AGREEMENT_PATTERNS.some((pattern) => pattern.test(text))
+}
+
+// Detects clear disinterest / opt-out / wrong number signals.
+// Triggers immediate opt-out without LLM call — saves cost and prevents
+// burning goodwill by trying to recruit someone who's clearly not interested.
+const HARD_OPT_OUT_PATTERNS = [
+  /\b(stop|unsubscribe|don'?t (message|contact|text) me|leave me alone|remove me)\b/i,
+  /\b(wrong number|wrong person|not me|never heard of|who (is this|are you))\b/i,
+  /\b(not interested|no thanks?|no thank you|not for me)\b/i,
+  /\b(do not (call|message|contact)|stop messaging)\b/i,
+  /\bf+\s*\*?\s*c?\s*k\b.*\b(off|you)\b/i  // catches abusive opt-outs
+]
+
+function detectHardOptOut(message) {
+  const text = String(message || "").trim()
+  if (!text) return false
+  return HARD_OPT_OUT_PATTERNS.some((pattern) => pattern.test(text))
+}
+
+// ---------------------------------------------------------------------------
+// CRITICAL SAFETY KILLSWITCH — legal / regulatory threat detection.
+// ---------------------------------------------------------------------------
+// If a prospect threatens legal action, regulatory complaint, or law
+// enforcement involvement, the bot goes COMPLETELY SILENT forever:
+//   - No reply, not even a polite acknowledgement
+//   - No follow-up, no stalled re-engagement, no win-back
+//   - No future campaigns will re-target this number
+//   - Any future inbound from them is ignored
+//
+// Total silence is the legally safest posture. Any reply confirms receipt
+// and could be construed as continued contact / harassment if the matter
+// escalates. The threatening message is stored verbatim for audit purposes.
+// ---------------------------------------------------------------------------
+
+const LEGAL_THREAT_PATTERNS = [
+  // Direct reporting threats
+  /\b(report(ing)? (you|this|your|the (number|company|bot|message|account)) (to|with))\b/i,
+  /\b(file (a |an )?(complaint|report|case|police report|legal complaint))\b/i,
+  /\b(filing (a |an )?(complaint|report|lawsuit|case))\b/i,
+  /\b(make (a |an )?(complaint|police report) (about|against))\b/i,
+
+  // Specific UAE regulatory & government bodies
+  /\b(tdra|cbuae|moi)\b/i,
+  /\b(public prosecution|ministry of (interior|human resources|economy))\b/i,
+  /\b(cybercrime|cyber crime|consumer protection|telecom regulatory|consumer rights)\b/i,
+  /\b(etisalat|du)\b.*\b(report|complaint|spam)\b/i,
+  /\b(report|complaint|spam|fraud)\b.*\b(etisalat|du)\b/i,  // reverse order
+
+  // Police / law enforcement
+  /\b(call(ing)? (the )?(police|authorities|cops))\b/i,
+  /\b(going to (the )?(police|authorities))\b/i,
+  /\b(police (report|complaint|case|involved)|file with (the )?police)\b/i,
+
+  // Legal action threats — require action context to avoid catching "my lawyer friend"
+  /\b(my (lawyer|attorney|solicitor))\b.*\b(will|is|going to|advised|told)\b/i,
+  /\b(legal team|legal action|legal proceedings)\b/i,
+  /\b(tak(e|ing) (you|this|tutorii|your company) to court|see you in court)\b/i,
+  /\b(sue (you|tutorii|your company)|suing (you|tutorii|your company))\b/i,
+  /\b(lawsuit|attorney|solicitor)\b.*\b(contact(ing)?|hire(d|ing)?|involved|action|on (this|it|the case))\b/i,
+  /\b(on (this|it|the case))\b.*\b(my (lawyer|attorney|solicitor))\b/i,
+
+  // Platform-level reporting
+  /\b(report(ing)? (you|this|your number) to whatsapp)\b/i,
+  /\b(blocked and reported|blocking (and |then )?reporting)\b/i,
+
+  // Direct accusations of criminality
+  /\b(this is (illegal|harassment|spam under (uae )?law|a criminal offence))\b/i,
+  /\b(criminal (charges|offence|complaint)|fraud charges)\b/i
+]
+
+function detectLegalThreat(message) {
+  const text = String(message || "").trim()
+  if (!text) return false
+  return LEGAL_THREAT_PATTERNS.some((pattern) => pattern.test(text))
+}
+
+// ---------------------------------------------------------------------------
+// Timing-signal extraction for deferrals.
+// Returns { delayMs, label } if a specific time hint is detected, else null.
+// Used to override the default 24-hour follow-up so we respect the user's
+// stated timing instead of nagging them.
+// ---------------------------------------------------------------------------
+
+const HOUR_MS = 60 * 60 * 1000
+const DAY_MS = 24 * HOUR_MS
+
+const TIMING_SIGNALS = [
+  // ~4-6 hours
+  {
+    patterns: [
+      /\b(in (a |an )?(few |couple of )?hours?|later today|in (an? )?hour|after work|when i (get home|get back|finish (work|today)))\b/i
+    ],
+    delayMs: 5 * HOUR_MS,
+    label: "later today"
+  },
+  // Tonight / this evening
+  {
+    patterns: [
+      /\b(tonight|this evening|later tonight|later this evening)\b/i
+    ],
+    delayMs: 6 * HOUR_MS,
+    label: "tonight"
+  },
+  // Tomorrow
+  {
+    patterns: [
+      /\b(tomorrow|tomorrow morning|tomorrow afternoon|tomorrow evening|in the morning|first thing tomorrow)\b/i
+    ],
+    delayMs: 22 * HOUR_MS,
+    label: "tomorrow"
+  },
+  // This weekend
+  {
+    patterns: [
+      /\b(this weekend|over the weekend|on the weekend|on saturday|on sunday)\b/i
+    ],
+    delayMs: 3 * DAY_MS,  // approx — the send-window logic will defer past weekend if needed
+    label: "this weekend"
+  },
+  // In a few days / later this week
+  {
+    patterns: [
+      /\b(in (a )?few days|in (a )?couple of days|later this week|in (a )?day or two)\b/i
+    ],
+    delayMs: 3 * DAY_MS,
+    label: "in a few days"
+  },
+  // Next week
+  {
+    patterns: [
+      /\b(next week|early next week|sometime next week|in (a )?week|in 7 days)\b/i
+    ],
+    delayMs: 7 * DAY_MS,
+    label: "next week"
+  },
+  // Next month / later (vague long horizon — treat as soft no)
+  {
+    patterns: [
+      /\b(next month|in (a )?few weeks|in (a )?couple of weeks|much later)\b/i
+    ],
+    delayMs: 14 * DAY_MS,
+    label: "later this month"
+  }
+]
+
+function extractTimingSignal(message) {
+  const text = String(message || "").trim()
+  if (!text) return null
+  for (const signal of TIMING_SIGNALS) {
+    if (signal.patterns.some((p) => p.test(text))) {
+      return { delayMs: signal.delayMs, label: signal.label }
+    }
+  }
+  return null
+}
+
+// ---------------------------------------------------------------------------
+// Soft-no detection — phrases that usually mean "no" but the user is being
+// polite. Different from genuine deferrals (which have specific timing).
+// We treat soft-no with a longer, gentler follow-up cadence.
+// ---------------------------------------------------------------------------
+
+const SOFT_NO_PATTERNS = [
+  /\b(we'?ll see|we will see|i'?ll see|let me think about it|i'?ll think about it|need to think|need some time to think|thinking about it)\b/i,
+  /\b(perhaps|might be (interested|something)|i'?ll (let you know|get back to you|come back to you))\b/i,
+  /\b(maybe (later|another time|next time|some other time))\b/i,
+  /\b(not (right )?now|not at the moment|not at this time)\b/i
+]
+
+function detectSoftNo(message) {
+  const text = String(message || "").trim()
+  if (!text) return false
+  return SOFT_NO_PATTERNS.some((pattern) => pattern.test(text))
+}
+
+// ---------------------------------------------------------------------------
+// Genuine deferral detection — "I'll look at it later" without committing
+// either way. These deserve respectful acknowledgement, not a re-pitch.
+// ---------------------------------------------------------------------------
+
+const DEFERRAL_PATTERNS = [
+  /\b(i'?ll (look|check|read|review|have a look|take a look|read up|check it out|look into (it|this)))\b/i,
+  /\b(let me (look|check|read|review|have a look|take a look|read up|check it out|look into (it|this)|see))\b/i,
+  /\b(i'?ll (get back to you|come back to you|message you back|reply later))\b/i,
+  /\b(can i (get back to you|come back to you|reply later|let you know))\b/i,
+  /\b(remind me|message me|text me)\b.*\b(later|tomorrow|tonight|next week|this evening)\b/i
+]
+
+function detectDeferral(message) {
+  const text = String(message || "").trim()
+  if (!text) return false
+  return DEFERRAL_PATTERNS.some((pattern) => pattern.test(text))
 }
 
 // ---------------------------------------------------------------------------
@@ -859,13 +1631,17 @@ export function createConversationEngine({
     return Math.max(baseDelayMs, windowWait)
   }
 
-  function scheduleFollowUp(userNumber) {
+  function scheduleFollowUp(userNumber, customDelayMs = null) {
     cancelFollowUp(userNumber)
 
-    // Spread follow-ups across a ±2 hour window to prevent all 1000 firing simultaneously
-    const JITTER_MS = 2 * 60 * 60 * 1000
-    const jitter = Math.floor(Math.random() * JITTER_MS * 2) - JITTER_MS
-    const delayMs = computeTimeAwareDelay(Math.max(0, followUpDelayMs + jitter))
+    // Use custom delay if provided (e.g. user said "tomorrow" → ~22h); else default 24h.
+    // Smaller jitter for short delays (<6h) to avoid overshooting the user's stated window.
+    const baseDelay = customDelayMs !== null ? customDelayMs : followUpDelayMs
+    const jitterRange = baseDelay < (6 * 60 * 60 * 1000)
+      ? 30 * 60 * 1000      // ±30 min for short windows ("in a few hours")
+      : 2 * 60 * 60 * 1000  // ±2 hours for longer windows
+    const jitter = Math.floor(Math.random() * jitterRange * 2) - jitterRange
+    const delayMs = computeTimeAwareDelay(Math.max(0, baseDelay + jitter))
     const scheduledAt = Date.now() + delayMs
 
     const timer = safeSetTimeout(() => {
@@ -1045,6 +1821,40 @@ export function createConversationEngine({
     const state = await getUserState(from, config.conversation.maxHistoryMessages)
     const outboundContextKey = normalizeText(message).slice(0, 200)
 
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // CRITICAL SAFETY KILLSWITCH (must run first)
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 1. If killswitch was previously triggered, ignore this message entirely.
+    if (state.killswitchTriggered) {
+      console.error(`🚨 Killswitch active for ${from} — inbound ignored (silenced ${new Date(state.killswitchTriggeredAt).toISOString()})`)
+      return
+    }
+
+    // 2. If this message contains a legal/regulatory threat, trigger the killswitch.
+    if (detectLegalThreat(message)) {
+      state.killswitchTriggered = true
+      state.killswitchTriggeredAt = Date.now()
+      state.killswitchMessage = String(message || "").slice(0, 500)
+      // Also mark opted out as a belt-and-braces safeguard against any other code path.
+      state.optedOut = true
+      state.optedOutAt = Date.now()
+
+      // Cancel ALL pending timers — no follow-ups, stalled, or win-back will fire.
+      cancelAllTimers(from)
+
+      // Persist immediately so even a crash now leaves the user permanently silenced.
+      await persistUserState(from, state)
+
+      // Loud, structured log for ops awareness — head of sales should review.
+      console.error(`🚨🚨 KILLSWITCH TRIGGERED for ${from}`)
+      console.error(`   Time:    ${new Date(state.killswitchTriggeredAt).toISOString()}`)
+      console.error(`   Message: "${state.killswitchMessage}"`)
+      console.error(`   Action:  All future communication suspended permanently.`)
+
+      // Total silence — no reply, no acknowledgement, nothing.
+      return
+    }
+
     // --- 7. Win-back reply handling ---
     if (state.optedOut && state.winBackSent) {
       state.optedOut = false
@@ -1082,6 +1892,63 @@ export function createConversationEngine({
       config.conversation.maxHistoryMessages
     )
 
+    // --- HARD OPT-OUT DETECTION (runs before LLM) ---
+    // Catches "stop", "wrong number", "not interested" etc. without burning
+    // an LLM call or risking the bot trying to "convince" them otherwise.
+    if (detectHardOptOut(message)) {
+      state.optedOut = true
+      state.optedOutAt = Date.now()
+      const closeMessage =
+        "Understood — I won't message again. All the best."
+      await appendHistory(
+        from,
+        state,
+        "assistant",
+        closeMessage,
+        config.conversation.maxHistoryMessages
+      )
+      await sendThrottledMessage({
+        to: from,
+        body: closeMessage,
+        state,
+        dedupeContextKey: outboundContextKey
+      })
+      await persistUserState(from, state)
+      scheduleWinBack(from)
+      debugLog(`🛑 Hard opt-out detected for ${from}, marked opted out`)
+      return
+    }
+
+    // --- CLEAR AGREEMENT DETECTION (runs before LLM) ---
+    // If user clearly agrees, force-advance to QUALIFIED so the LLM
+    // is primed to ask for email rather than re-pitching.
+    if (detectClearAgreement(message) && !state.linkSent) {
+      advanceStage(state, STAGES.QUALIFIED)
+      debugLog(`✅ Clear agreement detected for ${from}, advanced to QUALIFIED`)
+    }
+
+    // --- DEFERRAL & TIMING DETECTION ---
+    // If the user is deferring (and hasn't hit hard opt-out or clear agreement),
+    // we adjust the follow-up timing instead of nagging in 24h.
+    // - Specific timing: respect their stated window ("tomorrow" → ~22h)
+    // - Soft no: longer, gentler follow-up (5 days)
+    // - Generic deferral, no timing: 2 days
+    let customFollowUpDelayMs = null
+    const timingSignal = extractTimingSignal(message)
+    const isSoftNo = detectSoftNo(message)
+    const isDeferral = detectDeferral(message)
+
+    if (timingSignal) {
+      customFollowUpDelayMs = timingSignal.delayMs
+      debugLog(`⏰ Timing signal "${timingSignal.label}" detected for ${from} — follow-up scheduled accordingly`)
+    } else if (isSoftNo) {
+      customFollowUpDelayMs = 5 * 24 * 60 * 60 * 1000  // 5 days
+      debugLog(`🪶 Soft no detected for ${from} — gentle 5-day follow-up scheduled`)
+    } else if (isDeferral) {
+      customFollowUpDelayMs = 2 * 24 * 60 * 60 * 1000  // 2 days
+      debugLog(`📨 Deferral detected for ${from} — 2-day follow-up scheduled`)
+    }
+
     // --- 3. Objection detection ---
     const objection = detectObjection(message)
 
@@ -1103,7 +1970,7 @@ export function createConversationEngine({
       state.optedOut = true
       state.optedOutAt = Date.now()
       const closeMessage =
-        "No problem at all. I won't message again. If you ever want to check it out, just reply here anytime 👋"
+        "No problem at all. I won't message again. If you ever want to check out the agent role, just reply here anytime 👋"
 
       await appendHistory(
         from,
@@ -1128,15 +1995,43 @@ export function createConversationEngine({
     // --- Stage advancement ---
     advanceStage(state, turn.nextStage)
 
-    // --- Link delivery ---
+    // --- Account setup delivery ---
+    // We trigger the comprehensive welcome message ONLY when the user has provided
+    // an email address. This prevents premature firing if the LLM sets sendLinkNow=true
+    // before the user has actually committed their email.
+    const userEmail = extractEmail(message)
+
     const canSendLinkNow =
       !state.linkSent &&
-      turn.sendLinkNow &&
-      (state.stage === STAGES.QUALIFIED || state.stage === STAGES.LINK_SENT)
+      (turn.sendLinkNow || userEmail !== null) &&
+      userEmail !== null &&
+      (state.stage === STAGES.QUALIFIED || state.stage === STAGES.LINK_SENT || state.stage === STAGES.INTERESTED)
 
     if (canSendLinkNow) {
+      // Capture the email on state. The Tutorii platform reads this directly from
+      // the chat_users collection — no separate queue collection needed.
+      // Platform query: {linkSent: true, agentEmail: {$ne: ""}, accountProvisioned: {$ne: true}}
+      state.agentEmail = userEmail
+      state.agentEmailCapturedAt = Date.now()
+
       const linkMessage =
-        `Here you go 👇\n${config.links.signup}\n\nLet me know when you do, so I can help you get started.`
+`Brilliant — welcome aboard.
+
+I'll set up your free agent account using ${userEmail}. Here's exactly what happens next:
+
+1. Your account will be ready within the next few minutes.
+
+2. You'll receive an email at ${userEmail} with your login details and a temporary password.
+
+3. *Important*: As soon as you log in, go straight to "Forgot Password" and set your own password. We never see or store your password — this step is for your security.
+
+4. You'll also receive your sales script handbook by email — proven WhatsApp scripts and objection handlers to help you start recruiting paying subscribers from day one.
+
+5. Add your IBAN in Settings, grab your referral link from the dashboard, and you're earning.
+
+While you wait, have a proper look at ${config.links.signup} — that's the platform your future subscribers will pay AED 95/month for. Knowing the product inside-out makes selling it much easier.
+
+I'll check back in once your account is live. Anything else in the meantime, just message me here.`
 
       await sendThrottledMessage({
         to: from,
@@ -1156,6 +2051,7 @@ export function createConversationEngine({
       )
       await persistUserState(from, state)
 
+      console.log(`✅ Agent email captured for ${from}: ${userEmail}`)
       scheduleFollowUp(from)
       return
     }
@@ -1182,8 +2078,10 @@ export function createConversationEngine({
     })
     await persistUserState(from, state)
 
-    // Schedule follow-up in case they go silent
-    scheduleFollowUp(from)
+    // Schedule follow-up in case they go silent.
+    // Uses customFollowUpDelayMs if a timing signal / soft no / deferral was detected,
+    // otherwise falls back to default 24h.
+    scheduleFollowUp(from, customFollowUpDelayMs)
   }
 
   // -------------------------------------------------------------------------
@@ -1261,6 +2159,13 @@ export function createConversationEngine({
       await Promise.all(batch.map(async (number) => {
         try {
           const state = await getUserState(number, config.conversation.maxHistoryMessages)
+
+          // CRITICAL: Skip users where the killswitch was triggered (legal threat).
+          // These must NEVER be contacted again, even by future campaigns.
+          if (state.killswitchTriggered) {
+            console.error(`🚨 Skipping killswitched user ${number} (silenced ${new Date(state.killswitchTriggeredAt).toISOString()})`)
+            return
+          }
 
           // Skip opted-out users (win-back is handled by its own timer)
           if (state.optedOut) {

@@ -1,4 +1,3 @@
-import path from "path"
 import dotenv from "dotenv"
 import { toPositiveNumber } from "../utils/index.js"
 
@@ -11,8 +10,6 @@ const DEFAULT_TARGET_NUMBERS = [
   "+971501830069",
   "+923045172021"
 ]
-
-const PROMPTS_DIR = path.join(process.cwd(), "prompts")
 
 function getRequired(key, value) {
   if (!value) {
@@ -46,7 +43,6 @@ const mongoEnabled = Boolean(mongoUri || process.env.MONGODB_HOST)
 export const config = {
   port: toPositiveNumber(process.env.PORT, 3000),
   baseUrl: (process.env.BASE_URL || "").replace(/\/$/, ""),
-  promptsDir: PROMPTS_DIR,
   targets: new Set(DEFAULT_TARGET_NUMBERS),
   defaultTargets: DEFAULT_TARGET_NUMBERS.slice(),
   adminUi: {

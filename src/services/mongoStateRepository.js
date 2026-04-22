@@ -159,7 +159,12 @@ export function createMongoStateRepository({
           lastInboundAt: 0,
           stalledSent: false,
           winBackSent: false,
-          optedOutAt: 0
+          optedOutAt: 0,
+          killswitchTriggered: false,
+          killswitchTriggeredAt: 0,
+          killswitchMessage: "",
+          agentEmail: "",
+          agentEmailCapturedAt: 0
         }
       }
 
@@ -177,7 +182,12 @@ export function createMongoStateRepository({
         lastInboundAt: Number(userDoc.lastInboundAt) || 0,
         stalledSent: Boolean(userDoc.stalledSent),
         winBackSent: Boolean(userDoc.winBackSent),
-        optedOutAt: Number(userDoc.optedOutAt) || 0
+        optedOutAt: Number(userDoc.optedOutAt) || 0,
+        killswitchTriggered: Boolean(userDoc.killswitchTriggered),
+        killswitchTriggeredAt: Number(userDoc.killswitchTriggeredAt) || 0,
+        killswitchMessage: String(userDoc.killswitchMessage || ""),
+        agentEmail: String(userDoc.agentEmail || ""),
+        agentEmailCapturedAt: Number(userDoc.agentEmailCapturedAt) || 0
       }
     },
 
@@ -202,6 +212,11 @@ export function createMongoStateRepository({
             stalledSent: Boolean(state.stalledSent),
             winBackSent: Boolean(state.winBackSent),
             optedOutAt: Number(state.optedOutAt) || 0,
+            killswitchTriggered: Boolean(state.killswitchTriggered),
+            killswitchTriggeredAt: Number(state.killswitchTriggeredAt) || 0,
+            killswitchMessage: String(state.killswitchMessage || ""),
+            agentEmail: String(state.agentEmail || ""),
+            agentEmailCapturedAt: Number(state.agentEmailCapturedAt) || 0,
             updatedAt: now
           },
           $setOnInsert: {

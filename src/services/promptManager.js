@@ -1,5 +1,3 @@
-import fs from "fs"
-import path from "path"
 import { STAGES } from "../constants/stages.js"
 
 const STAGE_DIRECTIVES = {
@@ -17,33 +15,7 @@ const STAGE_DIRECTIVES = {
     "This user went cold a while ago. Re-open the conversation warmly, don't reference the gap, and give them one clear reason to take another look."
 }
 
-function safeRead(filePath) {
-  try {
-    return fs.readFileSync(filePath, "utf8").trim()
-  } catch (error) {
-    console.error(`⚠️ Prompt file missing: ${filePath}`)
-    return ""
-  }
-}
-
-function loadKnowledge(promptsDir) {
-  const promptFiles = [
-    "core-rules.txt",
-    "stage-playbook.txt",
-    "earnings-logic.txt"
-  ]
-
-  return promptFiles
-    .map((file) => safeRead(path.join(promptsDir, file)))
-    .filter(Boolean)
-    .join("\n\n")
-}
-
-function buildBaseSystemPrompt(knowledge, productKnowledge) {
-  const knowledgeSection = productKnowledge
-    ? `[PRODUCT KNOWLEDGE — USE THESE FACTS, DO NOT DEVIATE]\n${productKnowledge}`
-    : `[KNOWLEDGE]\n${knowledge}`
-
+function buildBaseSystemPrompt(productKnowledge) {
   return `
 [ROLE]
 You are Tutorii's experienced WhatsApp consultant.
@@ -77,7 +49,8 @@ Guide job seekers in UAE/GCC from curiosity to informed signup while staying com
 - Ask at most one question.
 - No markdown, no bullets, no decorative formatting.
 
-${knowledgeSection}
+[PRODUCT KNOWLEDGE — USE THESE FACTS, DO NOT DEVIATE]
+${productKnowledge}
 `.trim()
 }
 
@@ -160,12 +133,10 @@ ${transcript}
 `.trim()
 }
 
-export function createPromptManager({ promptsDir }) {
-  const knowledge = loadKnowledge(promptsDir)
-
+export function createPromptManager() {
   return {
     buildMessages({ state, history, objectionPrompt = null, socialProof = "", productKnowledge = "" }) {
-      const baseSystemPrompt = buildBaseSystemPrompt(knowledge, productKnowledge)
+      const baseSystemPrompt = buildBaseSystemPrompt(productKnowledge)
       const objectionBlock = buildObjectionPrompt(objectionPrompt)
 
       const systemMessages = [
