@@ -66,10 +66,17 @@ export function createTargetsManager({ targetsSet, repository }) {
     return result
   }
 
+  async function deleteAllTargets() {
+    const result = await repository.deleteAllTargets()
+    targetsSet.clear()
+    return result
+  }
+
   return {
     listTargets,
     addTarget,
     deleteTarget,
+    deleteAllTargets,
     importTargetsFromJson,
     refreshTargetsSet
   }

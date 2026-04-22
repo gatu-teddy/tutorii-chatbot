@@ -140,6 +140,14 @@ export function createMongoTargetsRepository({
       }
     },
 
+    async deleteAllTargets() {
+      ensureInitialized()
+
+      const result = await TargetModel.deleteMany({})
+
+      return { deletedCount: result.deletedCount || 0 }
+    },
+
     async close() {
       if (connection) {
         await connection.close()

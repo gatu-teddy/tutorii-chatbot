@@ -183,7 +183,14 @@ export function renderDashboardPage({
 
         <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:16px;">
           <section style="border:1px solid #e5e7eb; border-radius:10px; padding:12px;">
-            <h2 style="margin:0 0 10px; font-size:16px;">Current Targets</h2>
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+              <h2 style="margin:0; font-size:16px;">Current Targets</h2>
+              ${targets.length ? `<form method="post" action="/admin/targets/delete-all" style="margin:0;" onsubmit="return confirm('Delete all ${targets.length} target(s)? This cannot be undone.');">
+                <button type="submit" style="border:1px solid #ef4444; color:#b91c1c; background:#fff; border-radius:6px; padding:5px 10px; font-size:12px; cursor:pointer;">
+                  Delete All
+                </button>
+              </form>` : ""}
+            </div>
             <ul style="padding:0; margin:0; display:grid; gap:8px; max-height:280px; overflow:auto;">
               ${targetsList}
             </ul>

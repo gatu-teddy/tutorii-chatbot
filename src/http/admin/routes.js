@@ -142,5 +142,14 @@ export function createAdminRouter({ config, conversationEngine, targetsManager }
     }
   })
 
+  router.post("/targets/delete-all", sessions.requireAdmin, async (req, res) => {
+    try {
+      const result = await targetsManager.deleteAllTargets()
+      redirectWithMessage(res, "notice", `All targets deleted (${result.deletedCount} removed)`)
+    } catch (error) {
+      redirectWithMessage(res, "error", error.message)
+    }
+  })
+
   return router
 }
