@@ -281,6 +281,16 @@ export function createMongoStateRepository({
       }
     },
 
+    async clearAllUserState() {
+      ensureInitialized()
+      const userResult = await ChatUser.deleteMany({})
+      const msgResult = await ChatMessage.deleteMany({})
+      return {
+        usersDeleted: userResult.deletedCount || 0,
+        messagesDeleted: msgResult.deletedCount || 0
+      }
+    },
+
     async close() {
       if (connection) {
         await connection.close()

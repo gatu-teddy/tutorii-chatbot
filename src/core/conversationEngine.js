@@ -3,6 +3,7 @@ import { STAGES } from "../constants/stages.js"
 import {
   appendHistory,
   advanceStage,
+  clearAllStateCache,
   getUserState,
   persistUserState
 } from "./stateStore.js"
@@ -2369,6 +2370,14 @@ I'll check back in once your account is live. Anything else in the meantime, jus
     clearInterval(dedupeCleanupInterval)
   }
 
+  async function clearChatHistory() {
+    clearAllStateCache()
+    if (stateRepository?.clearAllUserState) {
+      return stateRepository.clearAllUserState()
+    }
+    return { usersDeleted: 0, messagesDeleted: 0 }
+  }
+
   return {
     init,
     processInbound,
@@ -2376,6 +2385,7 @@ I'll check back in once your account is live. Anything else in the meantime, jus
     startTemplateCampaign,
     cancelCampaign,
     getCampaignStatus,
+    clearChatHistory,
     destroy
   }
 }

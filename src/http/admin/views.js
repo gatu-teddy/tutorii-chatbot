@@ -181,6 +181,18 @@ export function renderDashboardPage({
 
         <hr style="margin:24px 0; border:0; border-top:1px solid #e5e7eb;" />
 
+        <div style="margin-bottom:16px; padding:12px; border:1px solid #fecaca; border-radius:10px; background:#fff5f5;">
+          <p style="margin:0 0 8px; font-size:13px; font-weight:600; color:#991b1b;">Danger Zone</p>
+          <p style="margin:0 0 10px; font-size:13px; color:#6b7280;">Clears all conversation history from MongoDB and the in-memory cache. Every prospect will be treated as new on their next message. This cannot be undone.</p>
+          <form method="post" action="/admin/chat-history/clear" onsubmit="return confirm('Clear ALL chat history? Every conversation will be reset. This cannot be undone.');">
+            <button type="submit" style="border:1px solid #dc2626; border-radius:8px; background:#dc2626; color:#fff; padding:9px 14px; font-size:13px; cursor:pointer;">
+              Clear All Chat History
+            </button>
+          </form>
+        </div>
+
+        <hr style="margin:24px 0; border:0; border-top:1px solid #e5e7eb;" />
+
         <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:16px;">
           <section style="border:1px solid #e5e7eb; border-radius:10px; padding:12px;">
             <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">

@@ -151,5 +151,15 @@ export function createAdminRouter({ config, conversationEngine, targetsManager }
     }
   })
 
+  router.post("/chat-history/clear", sessions.requireAdmin, async (req, res) => {
+    try {
+      const result = await conversationEngine.clearChatHistory()
+      redirectWithMessage(res, "notice", `Chat history cleared (${result.usersDeleted} users, ${result.messagesDeleted} messages deleted)`)
+    } catch (error) {
+      console.error("❌ Failed to clear chat history:", error.message)
+      redirectWithMessage(res, "error", "Could not clear chat history")
+    }
+  })
+
   return router
 }

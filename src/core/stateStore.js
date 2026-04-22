@@ -113,3 +113,7 @@ export function advanceStage(state, nextStage) {
     state.stage = nextStage
   }
 }
+
+export function clearAllStateCache() {
+  userStateByNumber.clear()
+}
