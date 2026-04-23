@@ -2390,8 +2390,8 @@ I'll check back in once your account is live. Anything else in the meantime, jus
         `🔗 Login here: ${loginUrl || "https://www.tutorii.com"}\n` +
         `📧 Email: ${loginEmail}\n` +
         `🔑 Temporary password: ${loginPassword}\n\n` +
-        `⚠️ Important: Log in and go to "Forgot Password" to set your own password immediately.\n\n` +
-        `Once you're in, add your IBAN in Settings and grab your referral link from the dashboard — you're ready to earn.`
+        `⚠️ Important: Once you're logged in, go to Settings and reset your password.\n\n` +
+        `Then add your IBAN in Settings and grab your referral link from the dashboard — you're ready to earn.`
 
       try {
         await twilioClient.messages.create({
