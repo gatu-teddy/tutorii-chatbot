@@ -281,6 +281,22 @@ export function createMongoStateRepository({
       }
     },
 
+    async findAccountsReadyForNotification(limit = 20) {
+      ensureInitialized()
+      return UserModel.find(
+        { accountCreated: true, notificationSent: { $ne: true } },
+        { _id: 1, loginEmail: 1, loginPassword: 1, loginUrl: 1 }
+      ).limit(limit).lean()
+    },
+
+    async markNotificationSent(userId) {
+      ensureInitialized()
+      await UserModel.updateOne(
+        { _id: userId },
+        { $set: { notificationSent: true, notificationSentAt: Date.now() } }
+      )
+    },
+
     async clearAllUserState() {
       ensureInitialized()
       const userResult = await UserModel.deleteMany({})

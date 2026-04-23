@@ -27,13 +27,18 @@ const chatUserSchema = new mongoose.Schema(
     agentEmail: { type: String, default: "" },
     agentEmailCapturedAt: { type: Number, default: 0 },
     // Provisioning state — written by the Tutorii platform's polling job
-    // once it has created the agent account. Bot polls these to know when
-    // to send the welcome WhatsApp with credentials + handbook.
     accountProvisioned: { type: Boolean, default: false },
     provisionedAt: { type: Number, default: 0 },
     tutoriiUserId: { type: String, default: "" },
     welcomeWhatsAppSent: { type: Boolean, default: false },
     welcomeSentAt: { type: Number, default: 0 },
+    // Credential delivery — platform writes these, bot reads and sends via WhatsApp
+    accountCreated: { type: Boolean, default: false },
+    loginEmail: { type: String, default: "" },
+    loginPassword: { type: String, default: "" },
+    loginUrl: { type: String, default: "" },
+    notificationSent: { type: Boolean, default: false },
+    notificationSentAt: { type: Number, default: 0 },
     // Timer persistence — Unix ms timestamps of when each timer should fire (0 = not scheduled)
     followUpScheduledAt: { type: Number, default: 0 },
     stalledScheduledAt: { type: Number, default: 0 },
@@ -46,8 +51,9 @@ const chatUserSchema = new mongoose.Schema(
 
 chatUserSchema.index({ updatedAt: -1 })
 // Indexes for platform & bot polling queries — keeps lookups fast at scale
-chatUserSchema.index({ linkSent: 1, accountProvisioned: 1 })       // platform: find pending provisioning
-chatUserSchema.index({ accountProvisioned: 1, welcomeWhatsAppSent: 1 })  // bot: find ready-to-welcome
+chatUserSchema.index({ linkSent: 1, accountProvisioned: 1 })
+chatUserSchema.index({ accountProvisioned: 1, welcomeWhatsAppSent: 1 })
+chatUserSchema.index({ accountCreated: 1, notificationSent: 1 })  // bot: find accounts ready for credential delivery
 
 export function getChatUserModel(connection) {
   return connection.models.ChatUser

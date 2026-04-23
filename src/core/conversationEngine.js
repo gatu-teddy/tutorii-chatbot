@@ -2364,10 +2364,54 @@ I'll check back in once your account is live. Anything else in the meantime, jus
     if (pending.length > 0) {
       console.log(`⏰ Restored ${pending.length} pending timer(s) from DB`)
     }
+
+    credentialPollInterval = setInterval(() => pollAndSendCredentials(), 60_000)
+    pollAndSendCredentials()
   }
+
+  async function pollAndSendCredentials() {
+    if (!stateRepository?.findAccountsReadyForNotification) return
+
+    let accounts
+    try {
+      accounts = await stateRepository.findAccountsReadyForNotification()
+    } catch (err) {
+      console.error("❌ Credential poll failed:", err.message)
+      return
+    }
+
+    for (const account of accounts) {
+      const userNumber = account._id
+      const { loginEmail, loginPassword, loginUrl } = account
+
+      if (!loginEmail || !loginPassword) continue
+
+      const body = `✅ Your Tutorii agent account is ready!\n\n` +
+        `🔗 Login here: ${loginUrl || "https://www.tutorii.com"}\n` +
+        `📧 Email: ${loginEmail}\n` +
+        `🔑 Temporary password: ${loginPassword}\n\n` +
+        `⚠️ Important: Log in and go to "Forgot Password" to set your own password immediately.\n\n` +
+        `Once you're in, add your IBAN in Settings and grab your referral link from the dashboard — you're ready to earn.`
+
+      try {
+        await twilioClient.messages.create({
+          from: config.twilio.from,
+          to: `whatsapp:${userNumber}`,
+          body
+        })
+        await stateRepository.markNotificationSent(userNumber)
+        console.log(`📨 Credentials sent to ${userNumber}`)
+      } catch (err) {
+        console.error(`❌ Failed to send credentials to ${userNumber}:`, err.message)
+      }
+    }
+  }
+
+  let credentialPollInterval = null
 
   function destroy() {
     clearInterval(dedupeCleanupInterval)
+    if (credentialPollInterval) clearInterval(credentialPollInterval)
   }
 
   async function clearChatHistory() {
