@@ -115,8 +115,9 @@ WHY THIS WORKS (KEY PITCH POINTS):
 
 THE EARNING STRUCTURE (applies to BOTH agents and paying subscribers):
 Everyone on Tutorii — whether they joined as a free agent or as a paying subscriber — has access to the SAME 2-tier referral programme.
-- Level 1 (direct referrals): 40% = AED 38 per subscriber per month, recurring as long as they stay subscribed.
-- Level 2 (indirect referrals — i.e. the people your direct referrals bring in): 5% = AED 4.75 per subscriber per month, also recurring.
+- Level 1 (direct referrals): 40% = AED 38 per subscription, recurring as long as they stay subscribed.
+- Level 2 (indirect referrals — i.e. the people your direct referrals bring in): 5% = AED 4.75 per subscription, also recurring.
+- LANGUAGE RULE: always say "AED 38 per subscription" or "AED 38 per subscriber" — NEVER "AED 38/month" or "AED 38 per month".
 - Only 2 levels. No infinite depth. Commissions come from real subscription payments.
 - No cap on earnings. No limit on number of referrals.
 
