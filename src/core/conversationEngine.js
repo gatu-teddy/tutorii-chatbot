@@ -2823,6 +2823,45 @@ I'll message you again once your account is ready. Any questions, just write bac
     }
   }
 
+  let credentialPollInterval = null
+
+  async function pollAndSendCredentials() {
+    if (!stateRepository?.findAccountsReadyForNotification) return
+
+    let accounts
+    try {
+      accounts = await stateRepository.findAccountsReadyForNotification()
+    } catch (err) {
+      console.error("❌ Credential poll failed:", err.message)
+      return
+    }
+
+    for (const account of accounts) {
+      const userNumber = account._id
+      const { loginEmail, loginPassword, loginUrl } = account
+
+      if (!loginEmail || !loginPassword) continue
+
+      const credentialBody = `✅ Your Tutorii agent account is ready!\n\n` +
+        `🔗 Login here: ${loginUrl || "https://www.tutorii.com"}\n` +
+        `📧 Email: ${loginEmail}\n` +
+        `🔑 Temporary password: ${loginPassword}\n\n` +
+        `⚠️ Important: Once you're logged in, go to Settings and reset your password.\n\n` +
+        `Then add your IBAN in Settings and grab your referral link from the dashboard — you're ready to earn.`
+
+      const handbookBody = `Here's your Sales Agent Handbook 📘 https://www.tutorii.com/salesguide/ — it covers everything you need to run effective marketing, so read it through so you know the platform inside out and feel confident pitching it. Then share it with anyone you're pitching — it'll help them understand the platform too. Often easier to send than to explain. Any questions, message me here.`
+
+      try {
+        await twilioClient.messages.create({ from: config.twilio.from, to: `whatsapp:${userNumber}`, body: credentialBody })
+        await twilioClient.messages.create({ from: config.twilio.from, to: `whatsapp:${userNumber}`, body: handbookBody })
+        await stateRepository.markNotificationSent(userNumber)
+        console.log(`📨 Credentials + handbook sent to ${userNumber}`)
+      } catch (err) {
+        console.error(`❌ Failed to send credentials to ${userNumber}:`, err.message)
+      }
+    }
+  }
+
   async function init() {
     if (!stateRepository?.findUsersWithPendingTimers) return
 
@@ -2874,10 +2913,14 @@ I'll message you again once your account is ready. Any questions, just write bac
     if (pending.length > 0) {
       console.log(`⏰ Restored ${pending.length} pending timer(s) from DB`)
     }
+
+    credentialPollInterval = setInterval(() => pollAndSendCredentials(), 60_000)
+    pollAndSendCredentials()
   }
 
   function destroy() {
     clearInterval(dedupeCleanupInterval)
+    if (credentialPollInterval) clearInterval(credentialPollInterval)
   }
 
   return {
