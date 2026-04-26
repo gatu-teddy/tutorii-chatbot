@@ -2518,29 +2518,7 @@ export function createConversationEngine({
       state.agentEmailCapturedAt = Date.now()
 
       const linkMessage =
-`Welcome! You're in.
-
-I'll set up your free agent account using ${userEmail}. Here's what happens next:
-
-1. Your account will be ready in a few minutes.
-
-2. I'll message you back here with your login details and a temporary password.
-
-3. *Important*: As soon as you log in, head to Settings and change your password to one only you know. We never see your password — this keeps your account safe.
-
-4. Right after that, I'll send your *Sales Agent Handbook* here on WhatsApp. This is what makes getting customers genuinely easy — it's the playbook our top agents actually use. The handbook gives you:
-   • Word-for-word WhatsApp scripts for messaging friends, family, colleagues, and groups
-   • A targeting guide — exactly who to approach first, second, and third (the people most likely to say yes are not who most agents start with)
-   • Specific places to find subscribers — which WhatsApp groups, expat communities, Facebook groups, Instagram angles, and Reddit threads to share in
-   • Word-for-word answers to the most common pushbacks (cost, time, scepticism)
-   • A simple first-5-referrals playbook to get you earning fast
-   • Exactly what top agents do differently — the small details that separate the people earning AED 200/month from the people earning AED 2,000+/month
-
-5. Add your bank details (IBAN) in Settings. Grab your referral link from your dashboard. You're earning.
-
-While you wait, have a look at ${config.links.signup} — that's what your customers will see and pay AED 95 a month for. The more you know the platform, the easier it is to share.
-
-I'll message you again once your account is ready. Any questions, just write back here.`
+`Brilliant — welcome aboard. I'll get your free agent account set up using ${userEmail}. I'll message you back here shortly with your login details. Any questions while you wait, just write back here.`
 
       await sendThrottledMessage({
         to: from,
