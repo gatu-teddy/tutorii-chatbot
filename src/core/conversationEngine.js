@@ -2146,7 +2146,7 @@ export function createConversationEngine({
       ? 30 * 60 * 1000      // ±30 min for short windows ("in a few hours")
       : 2 * 60 * 60 * 1000  // ±2 hours for longer windows
     const jitter = Math.floor(Math.random() * jitterRange * 2) - jitterRange
-    const delayMs = computeTimeAwareDelay(Math.max(0, baseDelay + jitter))
+    const delayMs = Math.max(0, baseDelay + jitter)
     const scheduledAt = Date.now() + delayMs
 
     const timer = safeSetTimeout(() => {
@@ -2166,7 +2166,7 @@ export function createConversationEngine({
       clearTimeout(existing)
     }
 
-    const delayMs = computeTimeAwareDelay(stalledDelayMs)
+    const delayMs = stalledDelayMs
     const scheduledAt = Date.now() + delayMs
 
     const timer = safeSetTimeout(() => {
@@ -2186,7 +2186,7 @@ export function createConversationEngine({
       clearTimeout(existing)
     }
 
-    const delayMs = computeTimeAwareDelay(winBackDelayMs)
+    const delayMs = winBackDelayMs
     const scheduledAt = Date.now() + delayMs
 
     const timer = safeSetTimeout(() => {
