@@ -2518,7 +2518,21 @@ export function createConversationEngine({
       state.agentEmailCapturedAt = Date.now()
 
       const linkMessage =
-`Brilliant — welcome aboard. I'll get your free agent account set up using ${userEmail}. I'll message you back here shortly with your login details. Any questions while you wait, just write back here.`
+`Welcome! You're in.
+
+I'll set up your free agent account using ${userEmail}. Here's what happens next:
+
+1. Your account will be ready in a few minutes.
+
+2. I'll message you back here with your login details and a temporary password.
+
+3. *Important*: As soon as you log in, head to Settings and change your password to one only you know. We never see your password — this keeps your account safe.
+
+4. Add your bank details (IBAN) in Settings. Grab your referral link from your dashboard. You're earning.
+
+While you wait, have a look at ${config.links.signup} — that's what your customers will see and pay AED 95 a month for. The more you know the platform, the easier it is to share.
+
+I'll message you again once your account is ready. Any questions, just write back here.`
 
       await sendThrottledMessage({
         to: from,
