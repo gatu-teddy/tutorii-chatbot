@@ -2508,9 +2508,7 @@ export function createConversationEngine({
 
     const canSendLinkNow =
       !state.linkSent &&
-      (turn.sendLinkNow || userEmail !== null) &&
-      userEmail !== null &&
-      (state.stage === STAGES.QUALIFIED || state.stage === STAGES.LINK_SENT || state.stage === STAGES.INTERESTED)
+      userEmail !== null
 
     if (canSendLinkNow) {
       // Capture the email on state. The Tutorii platform reads this directly from
