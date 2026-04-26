@@ -2518,21 +2518,23 @@ export function createConversationEngine({
       state.agentEmailCapturedAt = Date.now()
 
       const linkMessage =
-`Welcome! You're in.
+`Brilliant — welcome aboard.
 
-I'll set up your free agent account using ${userEmail}. Here's what happens next:
+I'll set up your free agent account using ${userEmail}. Here's exactly what happens next:
 
-1. Your account will be ready in a few minutes.
+1. Your account will be ready within the next few minutes.
 
-2. I'll message you back here with your login details and a temporary password.
+2. You'll receive an email at ${userEmail} with your login details and a temporary password.
 
-3. *Important*: As soon as you log in, head to Settings and change your password to one only you know. We never see your password — this keeps your account safe.
+3. *Important*: As soon as you log in, go straight to "Forgot Password" and set your own password. We never see or store your password — this step is for your security.
 
-4. Add your bank details (IBAN) in Settings. Grab your referral link from your dashboard. You're earning.
+4. You'll also receive your sales script handbook by email — proven WhatsApp scripts and objection handlers to help you start recruiting paying subscribers from day one.
 
-While you wait, have a look at ${config.links.signup} — that's what your customers will see and pay AED 95 a month for. The more you know the platform, the easier it is to share.
+5. Add your IBAN in Settings, grab your referral link from the dashboard, and you're earning.
 
-I'll message you again once your account is ready. Any questions, just write back here.`
+While you wait, have a proper look at ${config.links.signup} — that's the platform your future subscribers will pay AED 95/month for. Knowing the product inside-out makes selling it much easier.
+
+I'll check back in once your account is live. Anything else in the meantime, just message me here.`
 
       await sendThrottledMessage({
         to: from,
