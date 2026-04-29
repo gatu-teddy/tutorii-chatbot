@@ -1621,10 +1621,18 @@ const AGREEMENT_PATTERNS = [
   /\b(yes please|yes definitely|absolutely|definitely interested)\b/i
 ]
 
-function detectClearAgreement(message) {
+// Bare affirmatives — only treated as agreement when already in INTERESTED stage,
+// where the bot has been pitching and is likely asking "want to try it out?"
+const SOFT_AGREEMENT_PATTERNS = [
+  /^(yes|yeah|yep|yup|sure|okay|ok|alright|sounds good|why not|go ahead|do it)[!.,]?$/i
+]
+
+function detectClearAgreement(message, stage) {
   const text = String(message || "").trim()
   if (!text) return false
-  return AGREEMENT_PATTERNS.some((pattern) => pattern.test(text))
+  if (AGREEMENT_PATTERNS.some((pattern) => pattern.test(text))) return true
+  if (stage === STAGES.INTERESTED && SOFT_AGREEMENT_PATTERNS.some((pattern) => pattern.test(text))) return true
+  return false
 }
 
 // Detects clear disinterest / opt-out / wrong number signals.
@@ -2427,7 +2435,7 @@ export function createConversationEngine({
     // --- CLEAR AGREEMENT DETECTION (runs before LLM) ---
     // If user clearly agrees, force-advance to QUALIFIED so the LLM
     // is primed to ask for email rather than re-pitching.
-    if (detectClearAgreement(message) && !state.linkSent) {
+    if (detectClearAgreement(message, state.stage) && !state.linkSent) {
       advanceStage(state, STAGES.QUALIFIED)
       debugLog(`✅ Clear agreement detected for ${from}, advanced to QUALIFIED`)
     }
