@@ -2835,7 +2835,7 @@ I'll check back in once your account is live. Anything else in the meantime, jus
       if (!loginEmail || !loginPassword) continue
 
       const credentialBody = `✅ Your Tutorii agent account is ready!\n\n` +
-        `🔗 Login here: ${loginUrl || "https://www.tutorii.com"}\n` +
+        `🔗 Login here: ${loginUrl || "https://www.tutorii.com/login"}\n` +
         `📧 Email: ${loginEmail}\n` +
         `🔑 Temporary password: ${loginPassword}\n\n` +
         `⚠️ Important: Once you're logged in, go to Settings and reset your password.\n\n` +
