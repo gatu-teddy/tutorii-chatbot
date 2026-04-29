@@ -2526,7 +2526,7 @@ I'll set up your free agent account using ${userEmail}. Here's exactly what happ
 
 2. You'll receive an email at ${userEmail} with your login details and a temporary password.
 
-3. *Important*: As soon as you log in, go straight to "Forgot Password" and set your own password. We never see or store your password — this step is for your security.
+3. *Important*: As soon as you log in, go to Settings and reset your password. We never see or store your password — this step is for your security.
 
 4. You'll also receive your sales script handbook by email — proven WhatsApp scripts and objection handlers to help you start recruiting paying subscribers from day one.
 
