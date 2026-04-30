@@ -4,7 +4,8 @@ import {
   appendHistory,
   advanceStage,
   getUserState,
-  persistUserState
+  persistUserState,
+  clearAllStateCache
 } from "./stateStore.js"
 
 
