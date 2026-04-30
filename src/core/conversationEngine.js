@@ -2506,7 +2506,11 @@ export function createConversationEngine({
     }
 
     // --- Stage advancement ---
-    advanceStage(state, turn.nextStage)
+    // Never let the LLM advance to LINK_SENT — that stage is only set by the
+    // canSendLinkNow flow after the email is actually captured.
+    if (turn.nextStage !== STAGES.LINK_SENT) {
+      advanceStage(state, turn.nextStage)
+    }
 
     // --- Account setup delivery ---
     // We trigger the comprehensive welcome message ONLY when the user has provided
