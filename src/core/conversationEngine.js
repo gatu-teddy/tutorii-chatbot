@@ -2927,6 +2927,12 @@ I'll check back in once your account is live. Anything else in the meantime, jus
     if (credentialPollInterval) clearInterval(credentialPollInterval)
   }
 
+  async function clearChatHistory() {
+    if (!stateRepository?.clearAllUserState) return { usersDeleted: 0, messagesDeleted: 0 }
+    clearAllStateCache()
+    return stateRepository.clearAllUserState()
+  }
+
   return {
     init,
     processInbound,
@@ -2934,6 +2940,7 @@ I'll check back in once your account is live. Anything else in the meantime, jus
     startTemplateCampaign,
     cancelCampaign,
     getCampaignStatus,
+    clearChatHistory,
     destroy
   }
 }
